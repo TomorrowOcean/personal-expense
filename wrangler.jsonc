@@ -21,7 +21,7 @@
       // namespace id 是帳號內的識別碼，不是憑證——沒有 Cloudflare API token 拿它做不了任何事，
       // 而 wrangler 部署時必須讀得到它，所以放在這裡而非 secret。
       "binding": "CACHE",
-      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+      "id": "5aa2dec14f1d4229b46b60197aa496b5"
     }
   ]
 }
