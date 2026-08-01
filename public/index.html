@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>個人記帳</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f5f6fa" id="metaTheme">
+<style>
+:root{
+  --bg:#f5f6fa; --card:#ffffff; --card2:#f0f1f6; --ink:#181c25; --sub:#7a8494; --line:#e7e9f0;
+  --accent:#5b5bd6; --accent2:#7c7ce0; --on-accent:#ffffff;
+  --good:#16a06a; --bad:#e5484d; --warn:#b8860b;
+  --chip:#eceef4; --chip-ink:#454b58; --chip-on:#23262f; --chip-on-ink:#ffffff;
+  --shadow:0 1px 2px rgba(20,22,40,.04), 0 8px 24px -12px rgba(20,22,40,.12);
+  --shadow-lg:0 -8px 40px -8px rgba(20,22,40,.25);
+  --glass-hi:rgba(255,255,255,.55); --glass-hi2:rgba(255,255,255,.28); --glass-bg:rgba(255,255,255,.42);
+}
+:root[data-theme="dark"]{
+  --bg:#0e1015; --card:#171a21; --card2:#1e222b; --ink:#eceef2; --sub:#8b95a5; --line:#262b36;
+  --accent:#8687ec; --accent2:#6c6de0; --on-accent:#101218;
+  --good:#3ecf8e; --bad:#f2645a; --warn:#e2b93b;
+  --chip:#232834; --chip-ink:#b7bfcc; --chip-on:#e8eaf2; --chip-on-ink:#14161c;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  --shadow-lg:0 -8px 40px -8px rgba(0,0,0,.6);
+  --glass-hi:rgba(255,255,255,.18); --glass-hi2:rgba(255,255,255,.07); --glass-bg:rgba(30,34,44,.4);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]):not([data-theme="dark"]){
+    --bg:#0e1015; --card:#171a21; --card2:#1e222b; --ink:#eceef2; --sub:#8b95a5; --line:#262b36;
+    --accent:#8687ec; --accent2:#6c6de0; --on-accent:#101218;
+    --good:#3ecf8e; --bad:#f2645a; --warn:#e2b93b;
+    --chip:#232834; --chip-ink:#b7bfcc; --chip-on:#e8eaf2; --chip-on-ink:#14161c;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    --shadow-lg:0 -8px 40px -8px rgba(0,0,0,.6);
+    --glass-hi:rgba(255,255,255,.18); --glass-hi2:rgba(255,255,255,.07); --glass-bg:rgba(30,34,44,.4);
+  }
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; overscroll-behavior-y:none; overflow-x:clip} /* clip：拖曳換頁時頁面暫時變寬，禁止行動瀏覽器縮放視口 */
+body.lock{overflow:hidden}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Hiragino Sans","Microsoft JhengHei",system-ui,sans-serif;
+  padding-bottom:calc(104px + env(safe-area-inset-bottom));
+  transition:background .25s;
+  overscroll-behavior-y:contain; /* 避免下拉觸發瀏覽器重新整理 */
+}
+button{font-family:inherit; border:0; cursor:pointer; color:inherit; background:none; padding:0}
+input,select{font-family:inherit; font-size:16px; color:var(--ink); background:var(--card2);
+  border:1.5px solid transparent; border-radius:12px; padding:12px 14px; width:100%; outline:none; transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+h1{font-size:17px; margin:0; font-weight:800; letter-spacing:.02em}
+.hidden{display:none !important}
+svg.ic{width:1.25em; height:1.25em; flex:0 0 auto; vertical-align:-.25em}
+.dot{display:inline-block; width:9px; height:9px; border-radius:50%; flex:0 0 auto}
+
+/* ---- 頂欄 ---- */
+#topbar{position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px;
+  padding:calc(12px + env(safe-area-inset-top)) 18px 12px;
+  background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px)}
+.logo{width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#6366f1,#0ea5e9); color:#fff}
+.logo svg{width:17px; height:17px}
+#userPill{margin-left:auto; display:flex; align-items:center; gap:8px; background:var(--card);
+  border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; box-shadow:var(--shadow)}
+
+main{padding:6px 16px 0; max-width:520px; margin:0 auto; position:relative}
+@keyframes viewInR{from{opacity:0; transform:translateX(26px)} to{opacity:1; transform:none}}
+@keyframes viewInL{from{opacity:0; transform:translateX(-26px)} to{opacity:1; transform:none}}
+main section.slide-r{animation:viewInR .24s cubic-bezier(.25,.8,.35,1)}
+main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
+.card{background:var(--card); border-radius:20px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow)}
+.fieldlabel{font-size:12.5px; font-weight:700; color:var(--sub); margin:14px 2px 8px; letter-spacing:.04em; display:flex; align-items:center; gap:6px}
+.fieldlabel .spacer{flex:1}
+.fieldlabel button{color:var(--accent); font-size:12.5px; font-weight:700; white-space:nowrap}
+
+/* ---- chips / 網格 ---- */
+.chip{display:inline-flex; align-items:center; justify-content:center; gap:6px; background:var(--chip); color:var(--chip-ink);
+  border-radius:12px; padding:10px 8px; font-size:14px; font-weight:600; transition:transform .1s, background .15s, color .15s;
+  white-space:nowrap; overflow:hidden}
+.chip:active{transform:scale(.94)}
+.chip.on{background:var(--chip-on); color:var(--chip-on-ink)}
+.chip svg.ic{width:1.05em; height:1.05em}
+.grid{display:grid; gap:8px}
+.grid.c2{grid-template-columns:repeat(2,1fr)}
+.grid.c3{grid-template-columns:repeat(3,1fr)}
+.grid.c4{grid-template-columns:repeat(4,1fr)}
+.grid.c4 .chip{padding:10px 2px; font-size:13.5px}
+.hscroll{display:flex; gap:8px; overflow-x:auto; padding:2px; scrollbar-width:none}
+.hscroll::-webkit-scrollbar{display:none}
+.hscroll .chip{flex:0 0 auto}
+
+/* ---- 記帳 ---- */
+.seg{display:flex; background:var(--card2); border-radius:13px; padding:4px; gap:4px}
+.seg button{flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:9px 4px;
+  border-radius:10px; font-size:13.5px; font-weight:700; color:var(--sub); transition:all .15s; white-space:nowrap}
+.seg button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.seg button.on.inc{color:var(--good)}
+.seg button.on.exp{color:var(--bad)}
+#amt{font-size:46px; font-weight:800; text-align:right; margin:14px 6px 0; min-height:56px; letter-spacing:-.02em; word-break:break-all; font-variant-numeric:tabular-nums}
+#amtSub{text-align:right; font-size:13px; color:var(--sub); min-height:18px; margin:0 6px 10px; font-variant-numeric:tabular-nums}
+#keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:9px}
+#keypad button{background:var(--card2); border-radius:16px; font-size:23px; font-weight:700; padding:14px 0;
+  transition:transform .08s, background .15s; display:flex; align-items:center; justify-content:center}
+#keypad button:active{transform:scale(.93); background:var(--chip)}
+.textrow{margin-top:9px}
+#submitBtn{width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--on-accent);
+  font-size:17px; font-weight:800; border-radius:16px; padding:16px 0; margin-top:16px;
+  box-shadow:0 8px 20px -8px var(--accent); transition:transform .1s, opacity .2s}
+#submitBtn:active{transform:scale(.98)}
+#submitBtn:disabled{opacity:.4; box-shadow:none}
+.todayline{display:flex; justify-content:space-between; align-items:baseline; font-size:13.5px; color:var(--sub); padding:3px 0}
+.todayline > span{white-space:nowrap; flex:0 0 auto; margin-right:12px}
+.todayline b{color:var(--ink); font-size:15px; font-variant-numeric:tabular-nums; text-align:right}
+.scanbtn{width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 0;
+  border:1.5px dashed color-mix(in srgb, var(--accent) 45%, transparent); border-radius:14px;
+  color:var(--accent); font-weight:700; font-size:14px;
+  background:color-mix(in srgb, var(--accent) 6%, transparent)}
+.scanbtn:disabled{opacity:.6}
+.scanbtn .spin{width:15px; height:15px; border-width:2px}
+.ratewrap{display:flex; align-items:center; gap:10px; background:var(--card2); border-radius:12px; padding:9px 12px; margin-top:9px}
+.ratewrap .rl{font-size:12.5px; font-weight:700; color:var(--sub); white-space:nowrap}
+.ratewrap input{width:96px; text-align:right; padding:8px 10px; background:var(--card); font-size:15px}
+.ratewrap .rr{font-size:12.5px; color:var(--sub); margin-left:auto; font-variant-numeric:tabular-nums; text-align:right}
+.advwrap{display:flex; gap:9px; margin-top:9px}
+.advwrap .af{flex:1}
+.advwrap .af label{display:block; font-size:11.5px; font-weight:700; color:var(--sub); margin:0 0 4px 4px}
+.advwrap input{padding:10px 12px; font-size:15px}
+.switchrow{display:flex; align-items:center; gap:10px; font-size:14.5px; font-weight:600; padding:6px 2px}
+.switchrow input{width:22px; height:22px; accent-color:var(--accent); flex:0 0 auto}
+.switchrow .hint{font-size:11.5px; color:var(--sub); font-weight:500; margin-left:auto; text-align:right}
+
+/* ---- 記錄 ---- */
+.monthbar{display:flex; align-items:center; gap:6px; margin:0 2px 10px}
+.monthbar .mb{width:36px; height:36px; border-radius:50%; background:var(--card); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); color:var(--ink)}
+.monthbar .mb:disabled{opacity:.3}
+.monthbar .mb svg{width:16px; height:16px}
+.monthbar .mt{flex:1; text-align:center; font-size:16px; font-weight:800; font-variant-numeric:tabular-nums}
+.listhead{display:flex; align-items:center; gap:8px; margin:2px 2px 10px}
+.listhead .t{font-size:12px; color:var(--sub); font-variant-numeric:tabular-nums; flex:1}
+.tool-btn{display:inline-flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--line);
+  border-radius:999px; padding:8px 14px; font-size:12.5px; font-weight:700; color:var(--ink); box-shadow:var(--shadow); position:relative}
+.tool-btn .cnt{position:absolute; top:-5px; right:-5px; background:var(--accent); color:var(--on-accent);
+  font-size:10px; font-weight:800; border-radius:999px; min-width:17px; height:17px; display:flex; align-items:center; justify-content:center}
+.daterow{display:flex; justify-content:space-between; align-items:baseline; margin:16px 6px 8px}
+.daterow .d{font-weight:800; font-size:14px}
+.daterow .t{font-size:12px; color:var(--sub); font-variant-numeric:tabular-nums}
+.exp{display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--card);
+  border-radius:16px; margin-bottom:8px; width:100%; text-align:left; box-shadow:var(--shadow); transition:transform .1s}
+.exp:active{transform:scale(.98)}
+.cicon{width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex:0 0 auto}
+.cicon svg{width:19px; height:19px}
+.exp .rows{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px}
+.exp .r{display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0}
+.exp .name{font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
+.exp .a{font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; flex:0 0 auto}
+.exp .a.inc{color:var(--good)}
+.exp .m{font-size:12px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
+.exp .s{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums; flex:0 0 auto}
+.badge{display:inline-flex; align-items:center; font-size:10.5px; font-weight:700; border-radius:6px; padding:2px 6px; margin-left:6px}
+.badge.queue{background:color-mix(in srgb, var(--accent) 14%, transparent); color:var(--accent)}
+.badge.skip{background:color-mix(in srgb, var(--sub) 16%, transparent); color:var(--sub)}
+.empty{color:var(--sub); text-align:center; padding:40px 0; font-size:14px}
+.spin{display:inline-block; width:19px; height:19px; border:2.5px solid currentColor; border-top-color:transparent; border-radius:50%; animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ---- 統計 ---- */
+.sum3{display:grid; grid-template-columns:repeat(3,1fr); gap:2px}
+.sum3 .s1{text-align:center; padding:6px 2px}
+.sum3 .sl{font-size:11.5px; color:var(--sub); font-weight:700; letter-spacing:.03em}
+.sum3 .sv{font-size:19px; font-weight:800; margin-top:5px; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.sum3 .sv.inc{color:var(--good)} .sum3 .sv.exp{color:var(--bad)}
+.cmp{display:flex; align-items:center; justify-content:center; gap:5px; font-size:11px; font-weight:700; margin-top:4px; color:var(--sub)}
+.cmp svg{width:11px; height:11px}
+.cmp.up{color:var(--bad)} .cmp.down{color:var(--good)} .cmp.flat{color:var(--sub)}
+.cardtitle{font-size:13px; font-weight:800; color:var(--sub); letter-spacing:.05em; margin:0 2px 12px; display:flex; align-items:center; gap:7px}
+.cardtitle .spacer{flex:1}
+.donutwrap{display:flex; align-items:center; gap:14px}
+.donutwrap svg{width:132px; height:132px; flex:0 0 auto}
+.dlegend{flex:1; min-width:0; display:flex; flex-direction:column; gap:6px}
+.dl{display:flex; align-items:center; gap:7px; font-size:12px; width:100%; text-align:left}
+.dl .dot{width:8px; height:8px}
+.dl .n{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600}
+.dl .p{color:var(--sub); font-variant-numeric:tabular-nums; flex:0 0 auto}
+.dl .v{font-weight:700; font-variant-numeric:tabular-nums; flex:0 0 auto; min-width:52px; text-align:right}
+.chartbox{width:100%; overflow:hidden}
+.chartbox svg{width:100%; display:block}
+.axis{font-size:9px; fill:var(--sub); font-weight:600}
+.top10 .t1{display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--line); width:100%; text-align:left}
+.top10 .t1:last-child{border-bottom:0}
+.top10 .rk{width:18px; font-size:11px; font-weight:800; color:var(--sub); font-variant-numeric:tabular-nums; flex:0 0 auto}
+.top10 .nm{flex:1; min-width:0; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.top10 .dt{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums; flex:0 0 auto}
+.top10 .am{font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; flex:0 0 auto; min-width:62px; text-align:right}
+
+/* ---- 設定 ---- */
+.set-section{font-size:12px; font-weight:800; color:var(--sub); letter-spacing:.08em; margin:18px 8px 8px; text-transform:uppercase}
+.set-card{background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; margin-bottom:4px}
+.set-row{padding:13px 16px; border-bottom:1px solid var(--line)}
+.set-row:last-child{border-bottom:0}
+.set-row .lab{display:flex; align-items:center; gap:10px; font-size:14.5px; font-weight:600}
+.set-row .lab svg.ic{color:var(--sub)}
+.set-row .lab .val{margin-left:auto; font-size:13.5px; color:var(--sub); font-variant-numeric:tabular-nums; font-weight:500}
+.set-row .seg{margin-top:10px}
+.set-row .seg button{font-size:12.5px; padding:8px 4px}
+.set-row .sub{font-size:11.5px; color:var(--sub); margin-top:6px; line-height:1.55; font-weight:500}
+.upbtn{margin-left:6px; width:28px; height:28px; border-radius:50%; flex:0 0 auto;
+  background:color-mix(in srgb, var(--accent) 12%, transparent); color:var(--accent);
+  display:flex; align-items:center; justify-content:center; transition:transform .1s}
+.upbtn:active{transform:rotate(90deg) scale(.9)}
+.upbtn svg{width:15px; height:15px}
+.sw{margin-left:auto; width:46px; height:27px; border-radius:999px; background:var(--chip); position:relative; transition:background .2s; flex:0 0 auto}
+.sw i{position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw.on{background:var(--accent)}
+.sw.on i{transform:translateX(19px)}
+#logoutBtn{width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:15px 0;
+  color:var(--bad); font-size:15px; font-weight:800}
+.profile-hero{display:flex; align-items:center; gap:13px; padding:18px 16px}
+.profile-hero .av{width:44px; height:44px; border-radius:14px; flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--on-accent)}
+.profile-hero .av svg{width:22px; height:22px}
+.profile-hero .pn{font-size:18px; font-weight:800}
+.profile-hero .ps{font-size:12.5px; color:var(--sub); margin-top:3px}
+.note{font-size:12px; color:var(--sub); margin:10px 6px 0; line-height:1.6}
+.rrow{display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--line)}
+.rrow:last-child{border-bottom:0}
+.rrow .rc{font-size:14px; font-weight:800; width:46px; flex:0 0 auto}
+.rrow input{flex:1; text-align:right; padding:9px 12px; font-size:15px; background:var(--card2)}
+.rrow .eq{font-size:12px; color:var(--sub); white-space:nowrap; flex:0 0 auto}
+.tplrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line)}
+.tplrow:last-of-type{border-bottom:0}
+.tplrow .ti{flex:1; min-width:0}
+.tplrow .tn{font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.tplrow .tm{font-size:11.5px; color:var(--sub); margin-top:2px}
+.tplrow .ta{font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; flex:0 0 auto}
+.tplrow .tx{width:30px; height:30px; border-radius:50%; background:color-mix(in srgb, var(--bad) 12%, transparent);
+  color:var(--bad); display:flex; align-items:center; justify-content:center; flex:0 0 auto}
+.tplrow .tx svg{width:14px; height:14px}
+.addbtn{width:100%; display:flex; align-items:center; justify-content:center; gap:7px; padding:11px 0; margin-top:8px;
+  border:1.5px dashed var(--line); border-radius:13px; color:var(--accent); font-weight:700; font-size:13.5px}
+
+/* ---- 液態玻璃分頁列 ---- */
+#tabs{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(16px + env(safe-area-inset-bottom)); z-index:20;
+  display:flex; gap:2px; padding:7px;
+  background:linear-gradient(160deg, var(--glass-bg), color-mix(in srgb, var(--glass-bg) 55%, transparent));
+  backdrop-filter:blur(28px) saturate(1.9); -webkit-backdrop-filter:blur(28px) saturate(1.9);
+  border-radius:999px;
+  box-shadow:0 20px 44px -14px rgba(10,12,25,.4),
+    inset 0 1.5px 1px var(--glass-hi),
+    inset 0 -1px 1.5px var(--glass-hi2),
+    inset 1.5px 0 1px color-mix(in srgb, var(--glass-hi) 55%, transparent),
+    inset -1.5px 0 1px color-mix(in srgb, var(--glass-hi2) 80%, transparent)}
+#tabs::before{content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(180deg, var(--glass-hi2), transparent 45%, color-mix(in srgb, var(--glass-hi2) 40%, transparent) 92%)}
+#tabs button{position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0; width:70px;
+  font-size:10px; font-weight:700; color:var(--sub); border-radius:999px; transition:color .15s, background .2s, box-shadow .2s; white-space:nowrap}
+#tabs button svg{width:21px; height:21px}
+#tabs button.on{color:var(--accent);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 10%, transparent));
+  box-shadow:inset 0 1px 1px var(--glass-hi), inset 0 -1px 1px var(--glass-hi2), 0 2px 8px -2px color-mix(in srgb, var(--accent) 35%, transparent)}
+
+/* ---- 登入 / 鎖定 ---- */
+#login{position:fixed; inset:0; z-index:50; background:var(--bg); overflow-y:auto}
+.hero{position:relative; background:linear-gradient(150deg,#4f46e5 0%,#6366f1 40%,#0ea5e9 100%);
+  border-radius:0 0 30px 30px; padding:calc(54px + env(safe-area-inset-top)) 26px 78px; color:#fff; overflow:hidden}
+.hero .mark{width:52px; height:52px; border-radius:16px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3);
+  display:flex; align-items:center; justify-content:center; margin-bottom:14px; backdrop-filter:blur(4px)}
+.hero .mark svg{width:26px; height:26px}
+.hero h2{margin:0; font-size:27px; letter-spacing:.01em}
+.hero .sub{font-size:14px; opacity:.85; margin-top:6px; font-weight:600}
+.hero .scene{position:absolute; left:0; right:0; bottom:-2px; width:100%; pointer-events:none}
+.login-body{padding:22px 20px 40px; max-width:440px; margin:0 auto}
+.code-hint{font-size:13px; color:var(--sub); margin-bottom:16px; text-align:center}
+#codeInput{text-align:center; font-size:28px; letter-spacing:14px; font-weight:800; background:var(--card); padding:14px}
+#loginBtn{width:100%; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--on-accent);
+  font-weight:800; font-size:16px; border-radius:14px; padding:15px 0; margin-top:14px; box-shadow:0 8px 20px -8px var(--accent)}
+#loginErr{color:var(--bad); font-size:13px; min-height:18px; margin-top:10px; font-weight:600; text-align:center}
+#bioBtn{width:100%; display:flex; align-items:center; justify-content:center; gap:9px; padding:15px 0; margin-top:12px;
+  background:var(--card); border:1.5px solid var(--line); border-radius:14px; font-weight:800; font-size:15px; color:var(--accent); box-shadow:var(--shadow)}
+#bioBtn svg{width:20px; height:20px}
+.codealt{display:block; width:100%; text-align:center; margin-top:16px; font-size:13.5px; font-weight:700; color:var(--sub)}
+
+/* ---- 抽屜（編輯 / 篩選共用） ---- */
+#sheetWrap{position:fixed; inset:0; z-index:40; background:rgba(8,10,16,.5); display:flex; align-items:flex-end;
+  backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px)}
+#sheet{background:var(--bg); width:100%; max-height:86vh; overflow-y:auto; border-radius:24px 24px 0 0;
+  padding:0 18px calc(14px + env(safe-area-inset-bottom)); box-shadow:var(--shadow-lg); animation:slideUp .28s cubic-bezier(.2,.9,.3,1);
+  overscroll-behavior:contain}
+@keyframes slideUp{from{transform:translateY(60%); opacity:.4} to{transform:translateY(0); opacity:1}}
+.sheet-head{position:sticky; top:0; z-index:5; background:var(--bg); display:flex; align-items:center; justify-content:space-between;
+  padding:18px 0 12px; margin-bottom:6px; border-bottom:1px solid var(--line)}
+.sheet-head h3{margin:0; font-size:17px; font-weight:800}
+.xbtn{width:40px; height:40px; border-radius:50%; background:var(--card); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; color:var(--ink); box-shadow:var(--shadow)}
+.xbtn svg{width:18px; height:18px}
+.sheet-by{font-size:12px; color:var(--sub); margin:2px 0 12px; display:flex; align-items:center; gap:6px}
+.formrow{margin-bottom:12px}
+.formrow label{display:block; font-size:12px; font-weight:700; color:var(--sub); margin-bottom:5px}
+.sheetbtns{position:sticky; bottom:0; z-index:5; background:var(--bg); display:flex; gap:10px;
+  margin-top:10px; padding:10px 0 8px; border-top:1px solid var(--line)}
+.sheetbtns .save{flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--on-accent); font-weight:800;
+  border-radius:14px; padding:14px 0; font-size:16px}
+.sheetbtns .del{display:flex; align-items:center; justify-content:center; gap:6px;
+  background:color-mix(in srgb, var(--bad) 12%, transparent); color:var(--bad); font-weight:800; border-radius:14px; padding:14px 18px}
+.sheetbtns .ghost{flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:14px 18px;
+  background:var(--card2); color:var(--sub); font-weight:800; border-radius:14px}
+
+#toast{position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(8px); z-index:60;
+  background:var(--chip-on); color:var(--chip-on-ink); border-radius:14px; padding:11px 18px; font-size:13.5px; font-weight:700;
+  opacity:0; transition:opacity .25s, transform .25s; pointer-events:none; max-width:86vw; text-align:center; box-shadow:var(--shadow-lg)}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+#toast.act{pointer-events:auto}
+#toast button{background:color-mix(in srgb, var(--chip-on-ink) 16%, transparent); color:inherit;
+  border-radius:8px; padding:4px 12px; margin-left:10px; font-weight:800; font-size:12.5px}
+</style>
+</head>
+<body>
+
+<div id="login" class="hidden">
+  <div class="hero">
+    <div class="mark" id="heroMark"></div>
+    <h2 id="loginTitle"></h2>
+    <div class="sub" id="loginSub"></div>
+    <svg class="scene" viewBox="0 0 375 92" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="312" cy="26" r="12" fill="rgba(255,255,255,.5)"/>
+      <path d="M-8 92 L-8 74 L52 74 L52 92 Z" fill="rgba(255,255,255,.16)"/>
+      <path d="M66 92 L66 56 L126 56 L126 92 Z" fill="rgba(255,255,255,.22)"/>
+      <path d="M140 92 L140 64 L200 64 L200 92 Z" fill="rgba(255,255,255,.16)"/>
+      <path d="M214 92 L214 40 L274 40 L274 92 Z" fill="rgba(255,255,255,.28)"/>
+      <path d="M288 92 L288 60 L348 60 L348 92 Z" fill="rgba(255,255,255,.18)"/>
+      <path d="M22 66 L96 48 L170 56 L244 32 L318 52" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="244" cy="32" r="4.5" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="login-body">
+    <div class="code-hint" id="codeHint"></div>
+    <input id="codeInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="······" autocomplete="off">
+    <button id="loginBtn"></button>
+    <div id="loginErr"></div>
+    <button id="bioBtn" class="hidden"></button>
+    <button class="codealt hidden" id="codeAlt"></button>
+  </div>
+</div>
+
+<header id="topbar">
+  <div class="logo" id="topLogo"></div>
+  <h1 id="appTitle"></h1>
+  <button id="userPill"></button>
+</header>
+
+<main>
+  <section id="view-entry">
+    <div class="card">
+      <div class="grid c2" style="margin-bottom:14px">
+        <button id="scanCamBtn" class="scanbtn"></button>
+        <button id="scanAlbumBtn" class="scanbtn"></button>
+      </div>
+      <input type="file" id="scanFileCam" accept="image/*" capture="environment" class="hidden">
+      <input type="file" id="scanFile" accept="image/*" class="hidden">
+      <div class="seg" id="typeSeg"></div>
+      <div id="amt">0</div>
+      <div id="amtSub"></div>
+      <div id="keypad"></div>
+
+      <div class="fieldlabel"><span id="lblCat"></span></div>
+      <div class="grid c3" id="catChips"></div>
+
+      <div class="fieldlabel"><span id="lblPay"></span></div>
+      <div class="grid c3" id="payChips"></div>
+
+      <div class="fieldlabel"><span id="lblCur"></span><span class="spacer"></span><button id="curMore"></button></div>
+      <div class="hscroll" id="curChips"></div>
+      <div id="rateRow" class="ratewrap hidden">
+        <span class="rl" id="rateLbl"></span>
+        <input id="rateInput" inputmode="decimal">
+        <span class="rr" id="rateOut"></span>
+      </div>
+
+      <div id="tplWrap" class="hidden">
+        <div class="fieldlabel"><span id="lblTpl"></span></div>
+        <div class="hscroll" id="tplChips"></div>
+      </div>
+      <div id="recentWrap" class="hidden">
+        <div class="fieldlabel"><span id="lblRecent"></span></div>
+        <div class="hscroll" id="recentChips"></div>
+      </div>
+
+      <div class="textrow"><input id="nameInput" autocomplete="off"></div>
+      <div class="textrow"><input id="noteInput" autocomplete="off"></div>
+      <div class="textrow"><input id="dateInput" type="date"></div>
+
+      <div id="advWrap" class="advwrap hidden"></div>
+
+      <label class="switchrow" style="margin-top:10px">
+        <input type="checkbox" id="exclInput">
+        <span id="lblExcl"></span>
+        <span class="hint" id="lblExclHint"></span>
+      </label>
+
+      <button id="submitBtn"></button>
+    </div>
+    <div class="card" style="padding:13px 16px">
+      <div class="todayline"><span id="lblToday"></span><b id="todayTotal">–</b></div>
+      <div class="todayline"><span id="lblMonth"></span><b id="monthTotal">–</b></div>
+    </div>
+  </section>
+
+  <section id="view-list" class="hidden">
+    <div class="monthbar">
+      <button class="mb" id="mPrev"></button>
+      <div class="mt" id="mLabel"></div>
+      <button class="mb" id="mNext"></button>
+    </div>
+    <div class="listhead">
+      <span class="t" id="listSummary"></span>
+      <button class="tool-btn" id="filterBtn"></button>
+      <button class="tool-btn" id="refreshBtn"></button>
+    </div>
+    <div id="listBody"></div>
+  </section>
+
+  <section id="view-stats" class="hidden">
+    <div class="monthbar">
+      <button class="mb" id="sPrev"></button>
+      <div class="mt" id="sLabel"></div>
+      <button class="mb" id="sNext"></button>
+    </div>
+    <div class="card" id="sumCard"></div>
+    <div class="card" id="catCard"></div>
+    <div class="card" id="trendCard"></div>
+    <div class="card" id="dailyCard"></div>
+    <div class="card" id="topCard"></div>
+  </section>
+
+  <section id="view-settings" class="hidden">
+    <div class="set-card"><div class="profile-hero" id="profileHero"></div></div>
+    <div class="set-section" id="secAppearance"></div>
+    <div class="set-card">
+      <div class="set-row"><div class="lab" id="labTheme"></div><div class="seg" id="themeSeg"></div></div>
+      <div class="set-row"><div class="lab" id="labLang"></div><div class="seg" id="langSeg"></div></div>
+    </div>
+    <div class="set-section" id="secSecurity"></div>
+    <div class="set-card">
+      <div class="set-row"><div class="lab" id="labBio"></div><div class="sub" id="bioSub"></div></div>
+    </div>
+    <div class="set-section" id="secRate"></div>
+    <div class="set-card"><div class="set-row" id="rateRows"></div></div>
+    <div class="set-section" id="secTpl"></div>
+    <div class="set-card"><div class="set-row" id="tplRows"></div></div>
+    <div class="set-section" id="secAbout"></div>
+    <div class="set-card">
+      <div class="set-row"><div class="lab" id="labVer"></div></div>
+    </div>
+    <div class="set-card" style="margin-top:14px"><button id="logoutBtn"></button></div>
+    <div class="note" id="loginKeepNote" style="text-align:center"></div>
+  </section>
+</main>
+
+<nav id="tabs"></nav>
+
+<div id="sheetWrap" class="hidden"><div id="sheet"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const VERSION = 'v1.0';
+const BUILD = '2026-08-01';
+
+// ================= 圖示（SVG, 24x24 stroke） =================
+const P = {
+  wallet:'<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M4 5v14a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1"/><circle cx="16.5" cy="14" r="1" fill="currentColor" stroke="none"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".8" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r=".8" fill="currentColor" stroke="none"/>',
+  chart:'<path d="M3 21h18"/><rect x="4" y="11" width="4" height="7" rx="1"/><rect x="10" y="5" width="4" height="13" rx="1"/><rect x="16" y="14" width="4" height="4" rx="1"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01A1.7 1.7 0 0 0 10.05 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01c.26.63.87 1.04 1.56 1.04H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.94z"/>',
+  bowl:'<path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M9 8c0-1 1-1.5 1-2.5S9 4 9 3"/><path d="M14 8c0-1 1-1.5 1-2.5S14 4 14 3"/>',
+  shirt:'<path d="M8.5 3 4 5.6V10h3v11h10V10h3V5.6L15.5 3a3.6 3.6 0 0 1-7 0z"/>',
+  house:'<path d="m3 11 9-8 9 8"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M10 21v-6h4v6"/>',
+  car:'<path d="M5 16 6.3 9.8A2 2 0 0 1 8.2 8.3h7.6a2 2 0 0 1 1.9 1.5L19 16"/><path d="M3 16h18v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.3" cy="17" r=".6" fill="currentColor" stroke="none"/><circle cx="16.7" cy="17" r=".6" fill="currentColor" stroke="none"/>',
+  game:'<rect x="2" y="7" width="20" height="11" rx="4.5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16.2" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="18.4" cy="14.2" r=".9" fill="currentColor" stroke="none"/>',
+  heart:'<path d="M12 20.5s-7.5-4.7-7.5-10A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.5c0 5.3-7.5 10-7.5 10z"/>',
+  book:'<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>',
+  gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8S10.6 3 8.6 3a2.2 2.2 0 0 0 0 5z"/><path d="M12 8s1.4-5 3.4-5a2.2 2.2 0 0 1 0 5z"/>',
+  repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  box:'<path d="m21 8-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 8.3 12 13l8.7-4.7"/><path d="M12 22V13"/>',
+  award:'<circle cx="12" cy="9" r="6"/><path d="M8.2 14.3 7 22l5-3 5 3-1.2-7.7"/>',
+  trend:'<path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
+  undo:'<path d="M3 8h11a5 5 0 0 1 0 10H8"/><path d="m7 4-4 4 4 4"/>',
+  pluscircle:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>',
+  trash:'<path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="m19 6-1.2 14a1 1 0 0 1-1 .9H7.2a1 1 0 0 1-1-.9L5 6"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  chev:'<path d="m9 6 6 6-6 6"/>',
+  chevl:'<path d="m15 6-6 6 6 6"/>',
+  filter:'<path d="M4 5h16"/><path d="M7 12h10"/><path d="M10 19h4"/>',
+  cal:'<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/>',
+  camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  image:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/>',
+  swap:'<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  bookmark:'<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+  down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+  minus:'<path d="M5 12h14"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'
+};
+const icon = (n, cls='ic') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+
+// ================= 多語言 =================
+const I18N = {
+  zh: { appName:'個人記帳', loginSub:'收支記錄 · Notion 同步',
+    codeHint:'輸入 6 碼通行碼', enter:'進入', badLogin:'通行碼不正確', needCode:'請輸入 6 碼通行碼',
+    bioUnlock:'使用生物辨識解鎖', useCode:'改用通行碼', locked:'已鎖定',
+    tabEntry:'記帳', tabList:'記錄', tabStats:'統計', tabSettings:'設定',
+    expense:'支出', income:'收入', cat:'分類', pay:'付款方式', cur:'幣別', curMore:'更多幣別', curLess:'收合',
+    tpl:'常用範本', recent:'最近項目',
+    namePh:'項目名稱', notePh:'備註（選填）', submit:'記一筆',
+    excl:'不計入統計', exclHint:'信用卡還款、提領現金等',
+    today:'今天', monthSoFar:'本月支出',
+    saved:'已記錄', offlineSaved:'目前離線，已暫存，恢復網路後自動同步', synced:n=>`已同步 ${n} 筆離線記錄`,
+    undo:'復原', needAmt:'請先輸入金額', needName:'請輸入項目名稱',
+    rateLbl:c=>`1 ${c} =`, rateOut:v=>`≈ NT$${v}`,
+    km:'公里數', liter:'公升數', usage:'用量（度/度數）',
+    scanCam:'拍收據', scanAlbum:'相簿選圖', scanning:'辨識中…',
+    scanned:'已辨識，請確認後送出', scanFail:'辨識不到憑證內容，請手動輸入', scanErr:'掃描失敗：',
+    filter:'篩選', reset:'重設', done:'完成', refreshL:'更新', refreshed:'已更新',
+    fType:'類型', fCat:'分類（可複選）', fPay:'付款方式', fKw:'關鍵字', searchPh:'搜尋項目或備註',
+    allTypes:'全部', allPays:'全部', allCats:'全部',
+    summary:(n,inc,exp)=>`${n} 筆 · 收 ${inc} · 支 ${exp}`,
+    emptyList:'這個月還沒有記錄', pending:'待同步', pendingTip:'這筆還在離線佇列中，同步後才能編輯',
+    editTitle:'編輯記錄', fName:'項目名稱', fAmt:'金額', fCurL:'幣別', fRate:'匯率', fDt:'日期',
+    fNote:'備註', save:'儲存', del:'刪除', updated:'已更新', deleted:'已刪除',
+    delConfirm:s=>`確定刪除「${s}」？`, failed:'操作失敗：', offline:'無法連線：', relogin:'請重新登入',
+    stIncome:'收入', stExpense:'支出', stNet:'結餘',
+    vsLast:'較上月', noLast:'上月無資料',
+    catTitle:'分類佔比', trendTitle:'月度趨勢', dailyTitle:'每日花費', topTitle:'十大支出',
+    range6:'6 個月', range12:'12 個月', noData:'尚無資料',
+    secAppearance:'外觀與語言', secSecurity:'安全', secRate:'外幣匯率', secTpl:'常用範本', secAbout:'關於',
+    theme:'主題', themeSystem:'系統', themeLight:'淺色', themeDark:'深色', lang:'語言',
+    bio:'生物辨識解鎖', bioOn:'開啟後，每次開啟 App 需要 Face ID／指紋才能進入。這是本機的鎖定層，通行碼仍存在這台裝置上。',
+    bioUnsupported:'這台裝置或瀏覽器不支援生物辨識', bioFail:'驗證失敗', bioSet:'已開啟生物辨識解鎖',
+    rateNote:'記錄外幣時會帶入這裡的匯率，每一筆都會存下當時的匯率，日後改這裡不會動到舊資料。',
+    tplNote:'在記帳頁一點就帶入名稱、金額與分類，金額可再修改。',
+    tplAdd:'新增範本', tplName:'名稱', tplAmt:'金額', tplNameNeed:'請輸入名稱',
+    ver:'版本', logout:'登出', logoutConfirm:'要登出嗎？下次需要重新輸入通行碼。',
+    loginKeep:'登入狀態會保留在這台裝置上，直到你按下登出。',
+    wd:['日','一','二','三','四','五','六'], dayFmt:(m,d,w)=>`${m}/${d} (${w})`, monthFmt:(y,m)=>`${y} 年 ${m} 月`,
+    catNames:{}, payNames:{} },
+  en: { appName:'My Ledger', loginSub:'Income & expenses · synced to Notion',
+    codeHint:'Enter your 6-digit passcode', enter:'Continue', badLogin:'Wrong passcode', needCode:'Enter the 6-digit passcode',
+    bioUnlock:'Unlock with biometrics', useCode:'Use passcode instead', locked:'Locked',
+    tabEntry:'Add', tabList:'History', tabStats:'Stats', tabSettings:'Settings',
+    expense:'Expense', income:'Income', cat:'Category', pay:'Payment', cur:'Currency', curMore:'More', curLess:'Less',
+    tpl:'Templates', recent:'Recent',
+    namePh:'Item name', notePh:'Note (optional)', submit:'Add record',
+    excl:'Exclude from stats', exclHint:'card payoff, cash withdrawal…',
+    today:'Today', monthSoFar:'This month',
+    saved:'Saved', offlineSaved:'Offline — saved locally, will sync later', synced:n=>`Synced ${n} offline record(s)`,
+    undo:'Undo', needAmt:'Enter an amount first', needName:'Enter an item name',
+    rateLbl:c=>`1 ${c} =`, rateOut:v=>`≈ NT$${v}`,
+    km:'Distance (km)', liter:'Litres', usage:'Usage',
+    scanCam:'Scan receipt', scanAlbum:'From album', scanning:'Scanning…',
+    scanned:'Recognized — review then submit', scanFail:"Couldn't read the receipt — enter manually", scanErr:'Scan failed: ',
+    filter:'Filter', reset:'Reset', done:'Done', refreshL:'Refresh', refreshed:'Updated',
+    fType:'Type', fCat:'Category (multi)', fPay:'Payment', fKw:'Keyword', searchPh:'Search name or note',
+    allTypes:'Any', allPays:'Any', allCats:'All',
+    summary:(n,inc,exp)=>`${n} items · in ${inc} · out ${exp}`,
+    emptyList:'No records this month', pending:'Pending', pendingTip:'Still in the offline queue — editable after sync',
+    editTitle:'Edit record', fName:'Item', fAmt:'Amount', fCurL:'Currency', fRate:'Rate', fDt:'Date',
+    fNote:'Note', save:'Save', del:'Delete', updated:'Updated', deleted:'Deleted',
+    delConfirm:s=>`Delete "${s}"?`, failed:'Failed: ', offline:'Connection failed: ', relogin:'Please log in again',
+    stIncome:'Income', stExpense:'Expenses', stNet:'Net',
+    vsLast:'vs last month', noLast:'no data last month',
+    catTitle:'By category', trendTitle:'Monthly trend', dailyTitle:'Daily spend', topTitle:'Top 10 expenses',
+    range6:'6 mo', range12:'12 mo', noData:'No data yet',
+    secAppearance:'Appearance & Language', secSecurity:'Security', secRate:'Exchange rates', secTpl:'Templates', secAbout:'About',
+    theme:'Theme', themeSystem:'Auto', themeLight:'Light', themeDark:'Dark', lang:'Language',
+    bio:'Biometric unlock', bioOn:'Requires Face ID / fingerprint each time you open the app. This is a local lock; the passcode still lives on this device.',
+    bioUnsupported:'This device or browser does not support biometrics', bioFail:'Verification failed', bioSet:'Biometric unlock enabled',
+    rateNote:'Used as the default when logging foreign currency. Each record stores the rate used, so editing this never changes past records.',
+    tplNote:'One tap fills in the name, amount and category on the add page. The amount stays editable.',
+    tplAdd:'Add template', tplName:'Name', tplAmt:'Amount', tplNameNeed:'Enter a name',
+    ver:'Version', logout:'Log out', logoutConfirm:'Log out? You will need your passcode next time.',
+    loginKeep:'You stay signed in on this device until you log out.',
+    wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], dayFmt:(m,d,w)=>`${m}/${d} (${w})`, monthFmt:(y,m)=>`${m}/${y}`,
+    catNames:{'食':'Food','衣':'Clothing','住':'Home','行':'Transport','娛樂':'Fun','醫療健康':'Health',
+      '學習進修':'Learning','人情社交':'Social','訂閱服務':'Subscriptions','其他':'Other',
+      '薪資':'Salary','獎金':'Bonus','投資收益':'Investment','退款退費':'Refund','其他收入':'Other income'},
+    payNames:{'現金':'Cash','刷卡':'Card','轉帳':'Transfer','悠遊卡':'EasyCard','儲值卡':'Stored value','行動支付':'Mobile pay'} }
+};
+let lang = localStorage.getItem('pe_lang') || 'zh';
+const t = k => I18N[lang][k];
+const catName = c => I18N[lang].catNames[c] || c;
+const payName = p => I18N[lang].payNames[p] || p;
+
+// ================= 基本設定 =================
+// 這些字串就是 Notion select 的實際選項值，改動必須同步改 Notion 與 worker.js 的白名單
+const EXPENSE_CATS = ['食','衣','住','行','娛樂','醫療健康','學習進修','人情社交','訂閱服務','其他'];
+const INCOME_CATS = ['薪資','獎金','投資收益','退款退費','其他收入'];
+const PAYMENTS = ['現金','刷卡','轉帳','悠遊卡','儲值卡','行動支付'];
+const CAT_META = {
+  '食':{ic:'bowl',c:'#f59e0b'}, '衣':{ic:'shirt',c:'#a855f7'}, '住':{ic:'house',c:'#22c55e'},
+  '行':{ic:'car',c:'#3b82f6'}, '娛樂':{ic:'game',c:'#ec4899'}, '醫療健康':{ic:'heart',c:'#ef4444'},
+  '學習進修':{ic:'book',c:'#0ea5e9'}, '人情社交':{ic:'gift',c:'#f43f5e'}, '訂閱服務':{ic:'repeat',c:'#f97316'},
+  '其他':{ic:'box',c:'#6b7280'},
+  '薪資':{ic:'wallet',c:'#16a34a'}, '獎金':{ic:'award',c:'#eab308'}, '投資收益':{ic:'trend',c:'#0ea5e9'},
+  '退款退費':{ic:'undo',c:'#64748b'}, '其他收入':{ic:'pluscircle',c:'#6b7280'}
+};
+const CUR_SYM = {TWD:'NT$', JPY:'¥', USD:'US$', EUR:'€', KRW:'₩', CNY:'CN¥'};
+const DEFAULT_RATES = {JPY:0.21, USD:32, EUR:35, KRW:0.024, CNY:4.5};
+const $ = s => document.querySelector(s);
+
+let me = localStorage.getItem('pe_user') || '';
+let myCode = localStorage.getItem('pe_code') || '';
+let rates = load('pe_rates', DEFAULT_RATES);
+let templates = load('pe_tpl', []);
+let queue = load('pe_queue', []);
+let monthData = {};          // { 'YYYY-MM': [record, ...] } 已載入的月份
+let summaryCache = null;     // /api/summary 的結果
+let listMonth = thisMonth();
+let statsMonth = thisMonth();
+let curView = 'entry';
+
+function load(k, d) {
+  try { const v = JSON.parse(localStorage.getItem(k)); return v === null || v === undefined ? d : v; }
+  catch { return d; }
+}
+function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+// ================= 日期與金額工具 =================
+// 一律以裝置本地時間為準（使用者在台灣，Notion 存的是帶時區的 ISO 字串）
+function pad(n) { return String(n).padStart(2, '0'); }
+function thisMonth() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function shiftMonth(month, delta) {
+  const [y, m] = month.split('-').map(Number);
+  const tot = y * 12 + (m - 1) + delta;
+  return `${Math.floor(tot / 12)}-${pad((tot % 12) + 1)}`;
+}
+function monthLabel(month) {
+  const [y, m] = month.split('-').map(Number);
+  return I18N[lang].monthFmt(y, m);
+}
+function dayLabel(iso) {
+  const d = new Date(iso);
+  return I18N[lang].dayFmt(d.getMonth() + 1, d.getDate(), t('wd')[d.getDay()]);
+}
+// 把 <input type="date"> 的值配上現在的時分，存成帶時區的 ISO 字串
+function dateToISO(dateStr) {
+  const now = new Date();
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setHours(now.getHours(), now.getMinutes(), 0, 0);
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  return `${dateStr}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+}
+function nf(n) { return Math.round(n).toLocaleString('en-US'); }
+function money(n, cur = 'TWD') {
+  const s = CUR_SYM[cur] || '';
+  const v = cur === 'TWD' || cur === 'JPY' || cur === 'KRW' ? nf(n) : (Math.round(n * 100) / 100).toLocaleString('en-US');
+  return s + v;
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ================= Toast =================
+let toastTimer = null;
+function toast(msg, action) {
+  const el = $('#toast');
+  clearTimeout(toastTimer);
+  el.innerHTML = esc(msg) + (action ? `<button id="toastAct">${esc(action.label)}</button>` : '');
+  el.classList.toggle('act', !!action);
+  el.classList.add('show');
+  if (action) $('#toastAct').onclick = () => { el.classList.remove('show', 'act'); action.fn(); };
+  toastTimer = setTimeout(() => el.classList.remove('show', 'act'), action ? 5200 : 2200);
+}
+
+// ================= API =================
+async function api(path, opts = {}) {
+  const r = await fetch('/api' + path, {
+    ...opts,
+    headers: { 'content-type': 'application/json', 'x-user': me, 'x-code': myCode, ...(opts.headers || {}) }
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { logout(false); throw new Error(t('relogin')); }
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+// ================= 離線佇列 =================
+// 送出失敗（沒網路）時把整筆記錄暫存在手機，恢復連線後自動補送。
+// 佇列中的記錄會以「待同步」標記顯示在列表裡，但不可編輯（還沒有 Notion id）。
+function queueAdd(rec) {
+  queue.push({ ...rec, _qid: 'q' + Date.now() + Math.random().toString(36).slice(2, 6) });
+  save('pe_queue', queue);
+}
+async function flushQueue() {
+  if (!queue.length || !navigator.onLine || !me) return;
+  const pending = [...queue];
+  let ok = 0;
+  for (const item of pending) {
+    const { _qid, ...body } = item;
+    try {
+      await api('/expenses', { method: 'POST', body: JSON.stringify(body) });
+      queue = queue.filter(q => q._qid !== _qid);
+      ok++;
+    } catch { break; } // 一失敗就停手，剩下的下次再試，避免重複送出
+  }
+  save('pe_queue', queue);
+  if (ok) {
+    toast(t('synced')(ok));
+    monthData = {}; summaryCache = null;
+    await loadMonth(listMonth);
+    render();
+  }
+}
+
+// ================= 資料載入 =================
+async function loadMonth(month, fresh) {
+  const d = await api(`/expenses?month=${month}${fresh ? '&fresh=1' : ''}`);
+  monthData[month] = d.expenses;
+  return d.expenses;
+}
+async function ensureMonth(month, fresh) {
+  if (!fresh && monthData[month]) return monthData[month];
+  return loadMonth(month, fresh);
+}
+async function loadSummary(fresh) {
+  if (!fresh && summaryCache) return summaryCache;
+  const d = await api(`/summary?months=12${fresh ? '&fresh=1' : ''}`);
+  summaryCache = d.months;
+  return summaryCache;
+}
+// 佇列裡屬於這個月的記錄也要顯示出來（標記為待同步）
+function recordsOf(month) {
+  const base = monthData[month] || [];
+  const q = queue.filter(x => String(x.date).slice(0, 7) === month)
+    .map(x => ({ ...x, id: x._qid, pending: true, twd: (x.amount || 0) * (x.rate || 1), creator: me }));
+  return [...q, ...base].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+// ================= 主題 =================
+function applyTheme() {
+  const th = localStorage.getItem('pe_theme') || 'system';
+  if (th === 'system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', th);
+  const dark = th === 'dark' || (th === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  $('#metaTheme').setAttribute('content', dark ? '#0e1015' : '#f5f6fa');
+}
+
+// ================= 分頁與跟手換頁 =================
+const TABS = [
+  { v:'entry', ic:'plus', k:'tabEntry' },
+  { v:'list', ic:'list', k:'tabList' },
+  { v:'stats', ic:'chart', k:'tabStats' },
+  { v:'settings', ic:'gear', k:'tabSettings' }
+];
+const VIEW_ORDER = TABS.map(x => x.v);
+
+function renderTabs() {
+  $('#tabs').innerHTML = TABS.map(x =>
+    `<button data-v="${x.v}" class="${x.v === curView ? 'on' : ''}">${icon(x.ic)}<span>${esc(t(x.k))}</span></button>`
+  ).join('');
+  $('#tabs').querySelectorAll('button').forEach(b => {
+    b.onclick = () => switchView(b.dataset.v);
+  });
+}
+
+function switchView(target) {
+  if (target === curView) return;
+  const from = VIEW_ORDER.indexOf(curView), to = VIEW_ORDER.indexOf(target);
+  const el = $('#view-' + target);
+  $('#view-' + curView).classList.add('hidden');
+  el.classList.remove('hidden');
+  el.classList.remove('slide-l', 'slide-r');
+  void el.offsetWidth; // 強制重排，動畫才會重播
+  el.classList.add(to > from ? 'slide-r' : 'slide-l');
+  curView = target;
+  renderTabs();
+  renderView(target);
+  if (window.scrollY !== 0) window.scrollTo(0, 0);
+}
+
+// 內容區左右拖曳換頁：頁面跟著手指移動，放手超過寬度 28% 或快速一撥才翻頁。
+// 先判斷軸向，偏垂直就交還給捲動；輸入框與橫向捲動元件不觸發。
+let pg = null;
+function pagerStart(x, y, target) {
+  if (target.closest('input, select, textarea, .hscroll, #sheetWrap, #login, #tabs')) return;
+  pg = { x0: x, y0: y, dx: 0, axis: null, t0: Date.now(), moved: false };
+}
+function pagerMove(x, y, ev) {
+  if (!pg) return;
+  const dx = x - pg.x0, dy = y - pg.y0;
+  if (!pg.axis) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    pg.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+    if (pg.axis === 'y') { pg = null; return; }
+  }
+  const i = VIEW_ORDER.indexOf(curView);
+  let d = dx;
+  if ((i === 0 && d > 0) || (i === VIEW_ORDER.length - 1 && d < 0)) d *= 0.32; // 首尾阻尼
+  pg.dx = d;
+  pg.moved = true;
+  $('#view-' + curView).style.transform = `translateX(${d}px)`;
+  if (ev.cancelable) ev.preventDefault();
+}
+function pagerEnd() {
+  if (!pg) return;
+  const { dx, t0, moved } = pg;
+  pg = null;
+  const cur = $('#view-' + curView);
+  cur.style.transition = 'transform .22s cubic-bezier(.25,.8,.35,1)';
+  cur.style.transform = '';
+  setTimeout(() => { cur.style.transition = ''; }, 240);
+  if (!moved) return;
+  const i = VIEW_ORDER.indexOf(curView);
+  const fast = Math.abs(dx) / Math.max(Date.now() - t0, 1) > 0.5;
+  if ((Math.abs(dx) > innerWidth * 0.28 || fast)) {
+    if (dx < 0 && i < VIEW_ORDER.length - 1) switchView(VIEW_ORDER[i + 1]);
+    else if (dx > 0 && i > 0) switchView(VIEW_ORDER[i - 1]);
+  }
+}
+
+// ================= 登入與生物辨識鎖 =================
+// WebAuthn 在這裡當「本機解鎖層」：註冊一把平台憑證，之後每次開 App 要求 Face ID／指紋，
+// 通過才把畫面解鎖。伺服器端真正的驗證仍是通行碼（存在這台裝置的 localStorage）。
+// 裝置不支援、憑證被刪、或驗證失敗時，一律可退回輸入通行碼，不會把人鎖在門外。
+const bioEnabled = () => localStorage.getItem('pe_bio') === '1' && !!localStorage.getItem('pe_bio_id');
+
+function b64ToBuf(s) {
+  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u.buffer;
+}
+function bufToB64(b) {
+  return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function randChallenge() { return crypto.getRandomValues(new Uint8Array(32)).buffer; }
+
+async function bioRegister() {
+  if (!window.PublicKeyCredential) throw new Error(t('bioUnsupported'));
+  const cred = await navigator.credentials.create({
+    publicKey: {
+      challenge: randChallenge(),
+      rp: { name: I18N.zh.appName, id: location.hostname },
+      user: { id: new TextEncoder().encode(me || 'user'), name: me || 'user', displayName: me || 'user' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
+      timeout: 60000,
+      attestation: 'none'
+    }
+  });
+  if (!cred) throw new Error(t('bioFail'));
+  localStorage.setItem('pe_bio_id', bufToB64(cred.rawId));
+  localStorage.setItem('pe_bio', '1');
+}
+
+async function bioVerify() {
+  const id = localStorage.getItem('pe_bio_id');
+  if (!id) return false;
+  const cred = await navigator.credentials.get({
+    publicKey: {
+      challenge: randChallenge(),
+      allowCredentials: [{ type: 'public-key', id: b64ToBuf(id) }],
+      userVerification: 'required',
+      timeout: 60000
+    }
+  });
+  return !!cred;
+}
+
+function showLogin(lockedMode) {
+  $('#login').classList.remove('hidden');
+  document.body.classList.add('lock');
+  $('#heroMark').innerHTML = icon('wallet');
+  $('#loginTitle').textContent = t('appName');
+  $('#loginSub').textContent = lockedMode ? t('locked') : t('loginSub');
+  $('#codeHint').textContent = t('codeHint');
+  $('#loginBtn').textContent = t('enter');
+  $('#loginErr').textContent = '';
+  $('#codeInput').value = '';
+  const bio = lockedMode && bioEnabled();
+  $('#bioBtn').classList.toggle('hidden', !bio);
+  $('#bioBtn').innerHTML = icon('shield') + esc(t('bioUnlock'));
+  // 鎖定模式先只給生物辨識，「改用通行碼」點了才露出輸入框，避免看起來像沒鎖
+  $('#codeHint').classList.toggle('hidden', bio);
+  $('#codeInput').classList.toggle('hidden', bio);
+  $('#loginBtn').classList.toggle('hidden', bio);
+  $('#codeAlt').classList.toggle('hidden', !bio);
+  $('#codeAlt').textContent = t('useCode');
+  if (bio) tryBio();
+}
+
+async function tryBio() {
+  try {
+    if (await bioVerify()) unlock();
+  } catch { /* 使用者取消或驗證失敗：留在鎖定畫面，可改用通行碼 */ }
+}
+
+function unlock() {
+  $('#login').classList.add('hidden');
+  document.body.classList.remove('lock');
+  boot();
+}
+
+function logout(ask = true) {
+  if (ask && !confirm(t('logoutConfirm'))) return;
+  localStorage.removeItem('pe_user');
+  localStorage.removeItem('pe_code');
+  localStorage.removeItem('pe_bio');
+  localStorage.removeItem('pe_bio_id');
+  me = ''; myCode = '';
+  monthData = {}; summaryCache = null;
+  showLogin(false);
+}
+
+async function doLogin() {
+  const code = $('#codeInput').value.trim();
+  if (code.length < 4) { $('#loginErr').textContent = t('needCode'); return; }
+  // 單人使用時使用者名稱固定，通行碼由後端比對
+  const user = localStorage.getItem('pe_user') || 'Jason';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ user, code })
+    });
+    const d = await r.json();
+    if (!r.ok) { $('#loginErr').textContent = d.error || t('badLogin'); return; }
+    me = d.user; myCode = code;
+    localStorage.setItem('pe_user', me);
+    localStorage.setItem('pe_code', myCode);
+    unlock();
+  } catch (e) {
+    $('#loginErr').textContent = t('offline') + e.message;
+  }
+}
+
+// ================= 記帳頁 =================
+let entryType = '支出';
+let amtStr = '';
+let entryCat = '食';
+let entryPay = '現金';
+let entryCur = 'TWD';
+let curExpanded = false;
+let submitting = false;
+
+const catsOf = () => (entryType === '收入' ? INCOME_CATS : EXPENSE_CATS);
+const rateOf = c => (c === 'TWD' ? 1 : (Number(rates[c]) || DEFAULT_RATES[c] || 1));
+
+function renderTypeSeg() {
+  $('#typeSeg').innerHTML = [['支出', 'expense', 'exp'], ['收入', 'income', 'inc']]
+    .map(([v, k, cls]) => `<button data-v="${v}" class="${entryType === v ? 'on ' + cls : ''}">${esc(t(k))}</button>`).join('');
+  $('#typeSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    entryType = b.dataset.v;
+    if (!catsOf().includes(entryCat)) entryCat = catsOf()[0];
+    renderTypeSeg(); renderEntryChips(); renderAdv();
+  });
+}
+
+function renderAmt() {
+  const sym = CUR_SYM[entryCur] || '';
+  $('#amt').textContent = sym + (amtStr || '0');
+  const v = parseFloat(amtStr) || 0;
+  $('#amtSub').textContent = entryCur === 'TWD' || !v ? '' : t('rateOut')(nf(v * rateOf(entryCur)));
+}
+
+function renderKeypad() {
+  // 小數點只在有小數的幣別出現；整數幣別改給「00」加速輸入
+  const decimal = !['TWD', 'JPY', 'KRW'].includes(entryCur);
+  const keys = ['1','2','3','4','5','6','7','8','9', decimal ? '.' : '00', '0', '←'];
+  $('#keypad').innerHTML = keys.map(k => `<button data-k="${k}">${k === '←' ? icon('chevl') : k}</button>`).join('');
+  $('#keypad').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    if (k === '←') amtStr = amtStr.slice(0, -1);
+    else if (k === '.') { if (!amtStr.includes('.')) amtStr = (amtStr || '0') + '.'; }
+    else if (k === '00') { if (amtStr) amtStr += '00'; }
+    else {
+      if (amtStr.includes('.') && amtStr.split('.')[1].length >= 2) return;
+      if (amtStr.replace('.', '').length >= 10) return;
+      amtStr = amtStr === '0' ? k : amtStr + k;
+    }
+    renderAmt();
+  });
+}
+
+function chipRow(el, items, isOn, onTap, label) {
+  el.innerHTML = items.map(x =>
+    `<button class="chip ${isOn(x) ? 'on' : ''}" data-v="${esc(x)}">${label(x)}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => onTap(b.dataset.v));
+}
+
+function renderEntryChips() {
+  chipRow($('#catChips'), catsOf(), x => x === entryCat,
+    v => { entryCat = v; renderEntryChips(); renderAdv(); },
+    x => icon(CAT_META[x].ic) + esc(catName(x)));
+  chipRow($('#payChips'), PAYMENTS, x => x === entryPay,
+    v => { entryPay = v; renderEntryChips(); }, x => esc(payName(x)));
+
+  const list = curExpanded ? Object.keys(CUR_SYM) : ['TWD', 'JPY', 'USD'];
+  chipRow($('#curChips'), list, x => x === entryCur, v => {
+    entryCur = v;
+    $('#rateInput').value = rateOf(v);
+    renderEntryChips(); renderKeypad(); renderAmt(); renderRateRow();
+  }, x => esc(x));
+  $('#curMore').textContent = curExpanded ? t('curLess') : t('curMore');
+  renderRateRow();
+}
+
+function renderRateRow() {
+  const foreign = entryCur !== 'TWD';
+  $('#rateRow').classList.toggle('hidden', !foreign);
+  if (!foreign) return;
+  $('#rateLbl').textContent = t('rateLbl')(entryCur);
+  if (!$('#rateInput').value) $('#rateInput').value = rateOf(entryCur);
+  const v = parseFloat(amtStr) || 0;
+  $('#rateOut').textContent = 'NT$' + nf(v * (parseFloat($('#rateInput').value) || rateOf(entryCur)));
+}
+
+// 進階欄位只在對應分類出現：加油記里程與公升、水電記用量。平常完全看不到。
+function renderAdv() {
+  const fields = entryCat === '行' ? [['km', 'km'], ['liter', 'liter']]
+    : entryCat === '住' ? [['usage', 'usage']] : [];
+  const w = $('#advWrap');
+  w.classList.toggle('hidden', !fields.length);
+  if (!fields.length) { w.innerHTML = ''; return; }
+  const prev = {};
+  w.querySelectorAll('input').forEach(i => prev[i.dataset.f] = i.value);
+  w.innerHTML = fields.map(([f, k]) =>
+    `<div class="af"><label>${esc(t(k))}</label><input data-f="${f}" inputmode="decimal" value="${esc(prev[f] || '')}"></div>`).join('');
+}
+
+function renderTemplates() {
+  $('#tplWrap').classList.toggle('hidden', !templates.length);
+  if (!templates.length) return;
+  $('#lblTpl').textContent = t('tpl');
+  $('#tplChips').innerHTML = templates.map((x, i) =>
+    `<button class="chip" data-i="${i}">${icon(CAT_META[x.category] ? CAT_META[x.category].ic : 'box')}${esc(x.name)}</button>`).join('');
+  $('#tplChips').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const x = templates[+b.dataset.i];
+    entryType = x.type; entryCat = x.category; entryPay = x.payment || entryPay;
+    amtStr = x.amount ? String(x.amount) : '';
+    $('#nameInput').value = x.name;
+    renderTypeSeg(); renderEntryChips(); renderAdv(); renderAmt();
+  });
+}
+
+function renderRecent() {
+  // 從本月已載入的記錄裡取最近用過的項目名稱，點一下把名稱與分類一起帶入
+  const seen = new Set(); const out = [];
+  for (const r of (monthData[thisMonth()] || [])) {
+    if (!r.name || seen.has(r.name)) continue;
+    seen.add(r.name); out.push(r);
+    if (out.length >= 8) break;
+  }
+  $('#recentWrap').classList.toggle('hidden', !out.length);
+  if (!out.length) return;
+  $('#lblRecent').textContent = t('recent');
+  $('#recentChips').innerHTML = out.map((x, i) =>
+    `<button class="chip" data-i="${i}">${icon(CAT_META[x.category] ? CAT_META[x.category].ic : 'box')}${esc(x.name)}</button>`).join('');
+  $('#recentChips').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const x = out[+b.dataset.i];
+    entryType = x.type; entryCat = x.category; entryPay = x.payment || entryPay;
+    $('#nameInput').value = x.name;
+    renderTypeSeg(); renderEntryChips(); renderAdv();
+  });
+}
+
+function renderEntryTotals() {
+  const recs = recordsOf(thisMonth()).filter(r => !r.excluded && r.type === '支出');
+  const today = todayStr();
+  const dayTotal = recs.filter(r => String(r.date).slice(0, 10) === today).reduce((s, r) => s + (r.twd || 0), 0);
+  const monTotal = recs.reduce((s, r) => s + (r.twd || 0), 0);
+  $('#lblToday').textContent = t('today');
+  $('#lblMonth').textContent = t('monthSoFar');
+  $('#todayTotal').textContent = 'NT$' + nf(dayTotal);
+  $('#monthTotal').textContent = 'NT$' + nf(monTotal);
+}
+
+function renderEntry() {
+  $('#lblCat').textContent = t('cat');
+  $('#lblPay').textContent = t('pay');
+  $('#lblCur').textContent = t('cur');
+  $('#lblExcl').textContent = t('excl');
+  $('#lblExclHint').textContent = t('exclHint');
+  $('#nameInput').placeholder = t('namePh');
+  $('#noteInput').placeholder = t('notePh');
+  $('#submitBtn').innerHTML = icon('check') + esc(t('submit'));
+  $('#scanCamBtn').innerHTML = icon('camera') + esc(t('scanCam'));
+  $('#scanAlbumBtn').innerHTML = icon('image') + esc(t('scanAlbum'));
+  if (!$('#dateInput').value) $('#dateInput').value = todayStr();
+  renderTypeSeg(); renderKeypad(); renderAmt(); renderEntryChips();
+  renderAdv(); renderTemplates(); renderRecent(); renderEntryTotals();
+}
+
+function resetEntry() {
+  amtStr = '';
+  $('#nameInput').value = '';
+  $('#noteInput').value = '';
+  $('#dateInput').value = todayStr();
+  $('#exclInput').checked = false;
+  entryCur = 'TWD';
+  $('#advWrap').querySelectorAll('input').forEach(i => i.value = '');
+  renderKeypad(); renderAmt(); renderEntryChips(); renderAdv();
+}
+
+async function submitEntry() {
+  if (submitting) return;
+  const amount = parseFloat(amtStr) || 0;
+  if (amount <= 0) return toast(t('needAmt'));
+  const name = $('#nameInput').value.trim();
+  if (!name) return toast(t('needName'));
+
+  const rec = {
+    name,
+    date: dateToISO($('#dateInput').value || todayStr()),
+    type: entryType,
+    amount,
+    currency: entryCur,
+    rate: entryCur === 'TWD' ? 1 : (parseFloat($('#rateInput').value) || rateOf(entryCur)),
+    category: entryCat,
+    payment: entryPay,
+    note: $('#noteInput').value.trim(),
+    excluded: $('#exclInput').checked
+  };
+  $('#advWrap').querySelectorAll('input').forEach(i => {
+    if (i.value !== '') rec[i.dataset.f] = parseFloat(i.value) || 0;
+  });
+
+  submitting = true;
+  $('#submitBtn').innerHTML = '<span class="spin"></span>';
+  try {
+    const d = await api('/expenses', { method: 'POST', body: JSON.stringify(rec) });
+    const created = d.expense;
+    const mk = String(created.date).slice(0, 7);
+    if (monthData[mk]) monthData[mk].unshift(created);
+    summaryCache = null;
+    resetEntry();
+    // 送出後 5 秒內可以反悔，直接把剛剛那筆刪掉
+    toast(t('saved'), { label: t('undo'), fn: async () => {
+      try {
+        await api('/expenses/' + created.id, { method: 'DELETE' });
+        if (monthData[mk]) monthData[mk] = monthData[mk].filter(x => x.id !== created.id);
+        summaryCache = null;
+        render();
+      } catch (e) { toast(t('failed') + e.message); }
+    }});
+  } catch (e) {
+    // 沒網路就先存在手機，恢復連線後 flushQueue() 會補送
+    if (!navigator.onLine) { queueAdd(rec); resetEntry(); toast(t('offlineSaved')); }
+    else toast(t('failed') + e.message);
+  } finally {
+    submitting = false;
+    $('#submitBtn').innerHTML = icon('check') + esc(t('submit'));
+    render();
+  }
+}
+
+// ================= 收據辨識 =================
+// 照片在前端先壓到長邊 1280 的 JPEG 再上傳（省流量，順手把 iPhone 的 HEIC 轉掉），
+// 辨識完就丟，不存在任何地方。
+function compress(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image decode failed')); };
+    img.src = url;
+  });
+}
+
+async function doScan(file) {
+  if (!file) return;
+  const btns = [$('#scanCamBtn'), $('#scanAlbumBtn')];
+  const html = btns.map(b => b.innerHTML);
+  btns.forEach(b => { b.disabled = true; });
+  btns[0].innerHTML = '<span class="spin"></span>' + esc(t('scanning'));
+  try {
+    const image = await compress(file);
+    const d = await api('/scan', { method: 'POST', body: JSON.stringify({ image, mime: 'image/jpeg' }) });
+    if (!d.ok) { toast(t('scanFail')); return; }
+    const x = d.data;
+    entryType = '支出';
+    entryCur = x.currency;
+    entryCat = EXPENSE_CATS.includes(x.category) ? x.category : '其他';
+    amtStr = String(x.amount);
+    $('#nameInput').value = x.name || '';
+    if (x.date) $('#dateInput').value = x.date;
+    $('#rateInput').value = rateOf(entryCur);
+    renderTypeSeg(); renderKeypad(); renderAmt(); renderEntryChips(); renderAdv();
+    toast(t('scanned'));
+  } catch (e) {
+    toast(t('scanErr') + e.message);
+  } finally {
+    btns.forEach((b, i) => { b.disabled = false; b.innerHTML = html[i]; });
+  }
+}
+// ================= 記錄頁 =================
+let flt = { type: '', cats: [], pay: '', kw: '' };
+const activeFilterCount = () =>
+  (flt.type ? 1 : 0) + (flt.cats.length ? 1 : 0) + (flt.pay ? 1 : 0) + (flt.kw ? 1 : 0);
+
+function filtered() {
+  const kw = flt.kw.trim().toLowerCase();
+  return recordsOf(listMonth).filter(r => {
+    if (flt.type && r.type !== flt.type) return false;
+    if (flt.cats.length && !flt.cats.includes(r.category)) return false;
+    if (flt.pay && r.payment !== flt.pay) return false;
+    if (kw && !((r.name || '') + ' ' + (r.note || '')).toLowerCase().includes(kw)) return false;
+    return true;
+  });
+}
+
+function monthBar(prevId, labelId, nextId, month) {
+  $(prevId).innerHTML = icon('chevl');
+  $(nextId).innerHTML = icon('chev');
+  $(labelId).textContent = monthLabel(month);
+  $(nextId).disabled = month >= thisMonth(); // 不給看未來的月份
+}
+
+function renderList() {
+  monthBar('#mPrev', '#mLabel', '#mNext', listMonth);
+  $('#filterBtn').innerHTML = icon('filter') + esc(t('filter')) +
+    (activeFilterCount() ? `<span class="cnt">${activeFilterCount()}</span>` : '');
+  $('#refreshBtn').innerHTML = icon('refresh') + esc(t('refreshL'));
+
+  const rows = filtered();
+  const inc = rows.filter(r => r.type === '收入' && !r.excluded).reduce((s, r) => s + (r.twd || 0), 0);
+  const exp = rows.filter(r => r.type === '支出' && !r.excluded).reduce((s, r) => s + (r.twd || 0), 0);
+  $('#listSummary').textContent = t('summary')(rows.length, 'NT$' + nf(inc), 'NT$' + nf(exp));
+
+  if (!rows.length) { $('#listBody').innerHTML = `<div class="empty">${esc(t('emptyList'))}</div>`; return; }
+
+  const days = {};
+  for (const r of rows) (days[String(r.date).slice(0, 10)] ||= []).push(r);
+
+  $('#listBody').innerHTML = Object.keys(days).sort().reverse().map(day => {
+    const items = days[day];
+    const dayExp = items.filter(r => r.type === '支出' && !r.excluded).reduce((s, r) => s + (r.twd || 0), 0);
+    return `<div class="daterow"><span class="d">${esc(dayLabel(day + 'T00:00:00'))}</span>` +
+      `<span class="t">NT$${nf(dayExp)}</span></div>` +
+      items.map(r => {
+        const meta = CAT_META[r.category] || CAT_META['其他'];
+        const isInc = r.type === '收入';
+        const sub = [payName(r.payment), r.currency !== 'TWD' ? `${money(r.amount, r.currency)} @${r.rate}` : '', r.note]
+          .filter(Boolean).join(' · ');
+        return `<button class="exp" data-id="${esc(r.id)}">
+          <span class="cicon" style="background:${meta.c}1f; color:${meta.c}">${icon(meta.ic)}</span>
+          <span class="rows">
+            <span class="r"><span class="name">${esc(r.name || '—')}${r.pending ? `<span class="badge queue">${esc(t('pending'))}</span>` : ''}${r.excluded ? `<span class="badge skip">${esc(t('excl'))}</span>` : ''}</span>
+              <span class="a ${isInc ? 'inc' : ''}">${isInc ? '+' : ''}NT$${nf(r.twd || 0)}</span></span>
+            <span class="r"><span class="m">${esc(catName(r.category))}${sub ? ' · ' + esc(sub) : ''}</span>
+              <span class="s">${String(r.date).slice(11, 16)}</span></span>
+          </span></button>`;
+      }).join('');
+  }).join('');
+
+  $('#listBody').querySelectorAll('.exp').forEach(b => b.onclick = () => {
+    const r = rows.find(x => String(x.id) === b.dataset.id);
+    if (!r) return;
+    if (r.pending) return toast(t('pendingTip'));
+    openEditSheet(r);
+  });
+}
+
+// ================= 抽屜：篩選 =================
+function openSheet(html) {
+  $('#sheet').innerHTML = html;
+  $('#sheetWrap').classList.remove('hidden');
+  document.body.classList.add('lock');
+  $('#sheet').scrollTop = 0;
+}
+function closeSheet() {
+  $('#sheetWrap').classList.add('hidden');
+  document.body.classList.remove('lock');
+}
+
+function openFilterSheet() {
+  const allCats = [...EXPENSE_CATS, ...INCOME_CATS];
+  openSheet(`
+    <div class="sheet-head"><h3>${esc(t('filter'))}</h3>
+      <button class="xbtn" id="shClose">${icon('x')}</button></div>
+    <div class="formrow"><label>${esc(t('fKw'))}</label>
+      <input id="fKw" placeholder="${esc(t('searchPh'))}" value="${esc(flt.kw)}"></div>
+    <div class="formrow"><label>${esc(t('fType'))}</label><div class="grid c3" id="fType"></div></div>
+    <div class="formrow"><label>${esc(t('fPay'))}</label><div class="grid c3" id="fPay"></div></div>
+    <div class="formrow"><label>${esc(t('fCat'))}</label><div class="grid c3" id="fCat"></div></div>
+    <div class="sheetbtns">
+      <button class="ghost" id="fReset">${esc(t('reset'))}</button>
+      <button class="save" id="fDone">${icon('check')}${esc(t('done'))}</button></div>`);
+
+  const draw = () => {
+    chipRow($('#fType'), ['', '支出', '收入'], x => flt.type === x,
+      v => { flt.type = v; draw(); }, x => esc(x === '' ? t('allTypes') : t(x === '收入' ? 'income' : 'expense')));
+    chipRow($('#fPay'), ['', ...PAYMENTS], x => flt.pay === x,
+      v => { flt.pay = v; draw(); }, x => esc(x === '' ? t('allPays') : payName(x)));
+    chipRow($('#fCat'), allCats, x => flt.cats.includes(x), v => {
+      flt.cats = flt.cats.includes(v) ? flt.cats.filter(c => c !== v) : [...flt.cats, v];
+      draw();
+    }, x => icon(CAT_META[x].ic) + esc(catName(x)));
+  };
+  draw();
+  $('#fKw').oninput = e => { flt.kw = e.target.value; };
+  $('#shClose').onclick = () => { closeSheet(); renderList(); };
+  $('#fDone').onclick = () => { closeSheet(); renderList(); };
+  $('#fReset').onclick = () => { flt = { type: '', cats: [], pay: '', kw: '' }; closeSheet(); renderList(); };
+}
+
+// ================= 抽屜：編輯 =================
+function openEditSheet(r) {
+  const allCats = [...EXPENSE_CATS, ...INCOME_CATS];
+  let eCat = r.category, ePay = r.payment || '現金', eCur = r.currency, eType = r.type;
+  openSheet(`
+    <div class="sheet-head"><h3>${esc(t('editTitle'))}</h3>
+      <button class="xbtn" id="shClose">${icon('x')}</button></div>
+    <div class="sheet-by">${icon('user')}${esc(r.creator || '')}</div>
+    <div class="formrow"><label>${esc(t('fName'))}</label><input id="eName" value="${esc(r.name)}"></div>
+    <div class="formrow"><label>${esc(t('fType'))}</label><div class="grid c2" id="eType"></div></div>
+    <div class="formrow"><label>${esc(t('fAmt'))}</label><input id="eAmt" inputmode="decimal" value="${esc(r.amount)}"></div>
+    <div class="formrow"><label>${esc(t('fCurL'))}</label><div class="grid c3" id="eCur"></div></div>
+    <div class="formrow" id="eRateRow"><label>${esc(t('fRate'))}</label><input id="eRate" inputmode="decimal" value="${esc(r.rate)}"></div>
+    <div class="formrow"><label>${esc(t('fCat'))}</label><div class="grid c3" id="eCat"></div></div>
+    <div class="formrow"><label>${esc(t('pay'))}</label><div class="grid c3" id="ePay"></div></div>
+    <div class="formrow"><label>${esc(t('fDt'))}</label><input id="eDate" type="date" value="${String(r.date).slice(0, 10)}"></div>
+    <div class="formrow"><label>${esc(t('fNote'))}</label><input id="eNote" value="${esc(r.note || '')}"></div>
+    <label class="switchrow"><input type="checkbox" id="eExcl" ${r.excluded ? 'checked' : ''}><span>${esc(t('excl'))}</span></label>
+    <div class="sheetbtns">
+      <button class="del" id="eDel">${icon('trash')}</button>
+      <button class="save" id="eSave">${icon('check')}${esc(t('save'))}</button></div>`);
+
+  const draw = () => {
+    chipRow($('#eType'), ['支出', '收入'], x => eType === x, v => {
+      eType = v;
+      if (!(v === '收入' ? INCOME_CATS : EXPENSE_CATS).includes(eCat)) eCat = (v === '收入' ? INCOME_CATS : EXPENSE_CATS)[0];
+      draw();
+    }, x => esc(t(x === '收入' ? 'income' : 'expense')));
+    chipRow($('#eCur'), Object.keys(CUR_SYM), x => eCur === x, v => {
+      eCur = v;
+      if (v === 'TWD') $('#eRate').value = 1;
+      draw();
+    }, x => esc(x));
+    chipRow($('#eCat'), eType === '收入' ? INCOME_CATS : EXPENSE_CATS, x => eCat === x,
+      v => { eCat = v; draw(); }, x => icon(CAT_META[x].ic) + esc(catName(x)));
+    chipRow($('#ePay'), PAYMENTS, x => ePay === x, v => { ePay = v; draw(); }, x => esc(payName(x)));
+    $('#eRateRow').classList.toggle('hidden', eCur === 'TWD');
+  };
+  draw();
+
+  $('#shClose').onclick = closeSheet;
+
+  $('#eSave').onclick = async () => {
+    const body = {
+      name: $('#eName').value.trim(),
+      amount: parseFloat($('#eAmt').value) || 0,
+      currency: eCur,
+      rate: eCur === 'TWD' ? 1 : (parseFloat($('#eRate').value) || 1),
+      type: eType, category: eCat, payment: ePay,
+      date: dateToISO($('#eDate').value),
+      note: $('#eNote').value.trim(),
+      excluded: $('#eExcl').checked
+    };
+    $('#eSave').innerHTML = '<span class="spin"></span>';
+    try {
+      await api('/expenses/' + r.id, { method: 'PATCH', body: JSON.stringify(body) });
+      // 日期可能被改到別的月份，兩個月份都重抓最單純也最不會出錯
+      const oldM = String(r.date).slice(0, 7), newM = body.date.slice(0, 7);
+      delete monthData[oldM]; delete monthData[newM];
+      summaryCache = null;
+      closeSheet();
+      await ensureMonth(listMonth);
+      render();
+      toast(t('updated'));
+    } catch (e) {
+      $('#eSave').innerHTML = icon('check') + esc(t('save'));
+      toast(t('failed') + e.message);
+    }
+  };
+
+  $('#eDel').onclick = async () => {
+    if (!confirm(t('delConfirm')(r.name))) return;
+    try {
+      await api('/expenses/' + r.id, { method: 'DELETE' });
+      delete monthData[String(r.date).slice(0, 7)];
+      summaryCache = null;
+      closeSheet();
+      await ensureMonth(listMonth);
+      render();
+      toast(t('deleted'));
+    } catch (e) { toast(t('failed') + e.message); }
+  };
+}
+
+// ================= 統計頁 =================
+let trendRange = Number(localStorage.getItem('pe_trend')) || 12;
+
+function statsOf(month) {
+  const rows = (monthData[month] || []).filter(r => !r.excluded);
+  return {
+    income: rows.filter(r => r.type === '收入').reduce((s, r) => s + (r.twd || 0), 0),
+    expense: rows.filter(r => r.type === '支出').reduce((s, r) => s + (r.twd || 0), 0)
+  };
+}
+
+function renderSummaryCard() {
+  const cur = statsOf(statsMonth);
+  const prevM = shiftMonth(statsMonth, -1);
+  const hasPrev = !!monthData[prevM] || !!(summaryCache || []).find(x => x.month === prevM);
+  const prev = monthData[prevM] ? statsOf(prevM)
+    : (summaryCache || []).find(x => x.month === prevM) || null;
+  const net = cur.income - cur.expense;
+
+  let cmp = `<div class="cmp flat">${esc(t('noLast'))}</div>`;
+  if (hasPrev && prev && prev.expense > 0) {
+    const pct = Math.round((cur.expense - prev.expense) / prev.expense * 100);
+    const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+    const ic = pct > 0 ? 'up' : pct < 0 ? 'down' : 'minus';
+    // 正負號寫進文字裡，不只靠箭頭與顏色表達（色盲友善，截圖分享也讀得懂）
+    const sign = pct > 0 ? '+' : pct < 0 ? '−' : '';
+    cmp = `<div class="cmp ${cls}">${icon(ic)}${sign}${Math.abs(pct)}% · ${esc(t('vsLast'))}</div>`;
+  }
+  $('#sumCard').innerHTML = `<div class="sum3">
+      <div class="s1"><div class="sl">${esc(t('stIncome'))}</div><div class="sv inc">${nf(cur.income)}</div></div>
+      <div class="s1"><div class="sl">${esc(t('stExpense'))}</div><div class="sv exp">${nf(cur.expense)}</div>${cmp}</div>
+      <div class="s1"><div class="sl">${esc(t('stNet'))}</div><div class="sv" style="color:${net < 0 ? 'var(--bad)' : 'var(--ink)'}">${nf(net)}</div></div>
+    </div>`;
+}
+
+function renderCatCard() {
+  const rows = (monthData[statsMonth] || []).filter(r => r.type === '支出' && !r.excluded);
+  const total = rows.reduce((s, r) => s + (r.twd || 0), 0);
+  const by = {};
+  for (const r of rows) by[r.category] = (by[r.category] || 0) + (r.twd || 0);
+  const items = Object.entries(by).sort((a, b) => b[1] - a[1]);
+
+  let body;
+  if (!total) body = `<div class="empty">${esc(t('noData'))}</div>`;
+  else {
+    // 環形圖用 stroke-dasharray 疊圈，不需要任何圖表函式庫
+    const R = 54, C = 2 * Math.PI * R;
+    let acc = 0;
+    const arcs = items.map(([cat, v]) => {
+      const len = v / total * C;
+      const el = `<circle cx="66" cy="66" r="${R}" fill="none" stroke="${CAT_META[cat].c}" stroke-width="20"
+        stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}"
+        transform="rotate(-90 66 66)"/>`;
+      acc += len;
+      return el;
+    }).join('');
+    body = `<div class="donutwrap">
+      <svg viewBox="0 0 132 132">${arcs}</svg>
+      <div class="dlegend">${items.slice(0, 6).map(([cat, v]) => `
+        <button class="dl" data-c="${esc(cat)}">
+          <span class="dot" style="background:${CAT_META[cat].c}"></span>
+          <span class="n">${esc(catName(cat))}</span>
+          <span class="p">${Math.round(v / total * 100)}%</span>
+          <span class="v">${nf(v)}</span></button>`).join('')}</div></div>`;
+  }
+  $('#catCard').innerHTML = `<div class="cardtitle">${esc(t('catTitle'))}</div>` + body;
+  // 點分類直接跳到記錄頁並套用該分類的篩選
+  $('#catCard').querySelectorAll('.dl').forEach(b => b.onclick = () => {
+    flt = { type: '支出', cats: [b.dataset.c], pay: '', kw: '' };
+    listMonth = statsMonth;
+    switchView('list');
+  });
+}
+
+function renderTrendCard() {
+  const all = summaryCache || [];
+  const data = all.slice(-trendRange);
+  const seg = [6, 12].map(n =>
+    `<button data-n="${n}" class="${trendRange === n ? 'on' : ''}">${esc(t(n === 6 ? 'range6' : 'range12'))}</button>`).join('');
+  let body;
+  if (!data.length) body = `<div class="empty">${esc(t('noData'))}</div>`;
+  else {
+    const W = 320, H = 132, PADL = 6, PADR = 6, PADT = 10, PADB = 20;
+    const max = Math.max(1, ...data.map(d => Math.max(d.income, d.expense)));
+    const px = i => PADL + i * (W - PADL - PADR) / Math.max(1, data.length - 1);
+    const py = v => PADT + (1 - v / max) * (H - PADT - PADB);
+    const line = key => data.map((d, i) => `${px(i).toFixed(1)},${py(d[key]).toFixed(1)}`).join(' ');
+    const dots = (key, col) => data.map((d, i) =>
+      `<circle cx="${px(i).toFixed(1)}" cy="${py(d[key]).toFixed(1)}" r="2.4" fill="${col}"/>`).join('');
+    // 月份標籤太密會疊在一起，12 個月時隔一個標一次
+    const step = data.length > 7 ? 2 : 1;
+    const labels = data.map((d, i) => i % step === 0
+      ? `<text class="axis" x="${px(i).toFixed(1)}" y="${H - 5}" text-anchor="middle">${Number(d.month.slice(5))}</text>` : '').join('');
+    body = `<div class="chartbox"><svg viewBox="0 0 ${W} ${H}">
+      <polyline points="${line('income')}" fill="none" stroke="var(--good)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <polyline points="${line('expense')}" fill="none" stroke="var(--bad)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots('income', 'var(--good)')}${dots('expense', 'var(--bad)')}${labels}
+    </svg></div>
+    <div class="dl" style="gap:14px; margin-top:8px; justify-content:center">
+      <span style="display:inline-flex; align-items:center; gap:5px"><span class="dot" style="background:var(--good)"></span>${esc(t('stIncome'))}</span>
+      <span style="display:inline-flex; align-items:center; gap:5px"><span class="dot" style="background:var(--bad)"></span>${esc(t('stExpense'))}</span>
+    </div>`;
+  }
+  $('#trendCard').innerHTML =
+    `<div class="cardtitle">${esc(t('trendTitle'))}<span class="spacer"></span></div>
+     <div class="seg" id="trendSeg" style="margin-bottom:12px">${seg}</div>` + body;
+  $('#trendSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    trendRange = +b.dataset.n;
+    localStorage.setItem('pe_trend', trendRange);
+    renderTrendCard();
+  });
+}
+
+function renderDailyCard() {
+  const rows = (monthData[statsMonth] || []).filter(r => r.type === '支出' && !r.excluded);
+  const [y, m] = statsMonth.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  const by = new Array(days).fill(0);
+  for (const r of rows) {
+    const d = Number(String(r.date).slice(8, 10));
+    if (d >= 1 && d <= days) by[d - 1] += r.twd || 0;
+  }
+  const max = Math.max(1, ...by);
+  const W = 320, H = 96, PADB = 16;
+  const bw = W / days;
+  const bars = by.map((v, i) => {
+    const h = v / max * (H - PADB - 4);
+    return `<rect x="${(i * bw + bw * 0.16).toFixed(2)}" y="${(H - PADB - h).toFixed(2)}"
+      width="${(bw * 0.68).toFixed(2)}" height="${Math.max(h, v > 0 ? 1.5 : 0).toFixed(2)}" rx="1.2" fill="var(--accent)"/>`;
+  }).join('');
+  const labels = [1, Math.ceil(days / 2), days].map(d =>
+    `<text class="axis" x="${((d - 0.5) * bw).toFixed(1)}" y="${H - 3}" text-anchor="middle">${d}</text>`).join('');
+  const total = by.reduce((s, v) => s + v, 0);
+  $('#dailyCard').innerHTML = `<div class="cardtitle">${esc(t('dailyTitle'))}<span class="spacer"></span>
+      <span style="font-weight:700; color:var(--ink)">NT$${nf(total)}</span></div>` +
+    (total ? `<div class="chartbox"><svg viewBox="0 0 ${W} ${H}">${bars}${labels}</svg></div>`
+           : `<div class="empty">${esc(t('noData'))}</div>`);
+}
+
+function renderTopCard() {
+  const rows = (monthData[statsMonth] || [])
+    .filter(r => r.type === '支出' && !r.excluded)
+    .sort((a, b) => (b.twd || 0) - (a.twd || 0)).slice(0, 10);
+  $('#topCard').innerHTML = `<div class="cardtitle">${esc(t('topTitle'))}</div>` +
+    (rows.length ? `<div class="top10">${rows.map((r, i) => `
+      <button class="t1" data-id="${esc(r.id)}">
+        <span class="rk">${i + 1}</span>
+        <span class="nm">${esc(r.name || '—')}</span>
+        <span class="dt">${String(r.date).slice(5, 10)}</span>
+        <span class="am">NT$${nf(r.twd || 0)}</span></button>`).join('')}</div>`
+      : `<div class="empty">${esc(t('noData'))}</div>`);
+  $('#topCard').querySelectorAll('.t1').forEach(b => b.onclick = () => {
+    const r = rows.find(x => String(x.id) === b.dataset.id);
+    if (r) openEditSheet(r);
+  });
+}
+
+function renderStats() {
+  monthBar('#sPrev', '#sLabel', '#sNext', statsMonth);
+  renderSummaryCard(); renderCatCard(); renderTrendCard(); renderDailyCard(); renderTopCard();
+}
+// ================= 設定頁 =================
+function renderSettings() {
+  $('#profileHero').innerHTML = `<span class="av">${icon('user')}</span>
+    <span><div class="pn">${esc(me)}</div><div class="ps">${esc(t('loginSub'))}</div></span>`;
+  $('#secAppearance').textContent = t('secAppearance');
+  $('#secSecurity').textContent = t('secSecurity');
+  $('#secRate').textContent = t('secRate');
+  $('#secTpl').textContent = t('secTpl');
+  $('#secAbout').textContent = t('secAbout');
+  $('#labTheme').innerHTML = icon('sun') + esc(t('theme'));
+  $('#labLang').innerHTML = icon('globe') + esc(t('lang'));
+  $('#logoutBtn').innerHTML = icon('logout') + esc(t('logout'));
+  $('#loginKeepNote').textContent = t('loginKeep');
+
+  const th = localStorage.getItem('pe_theme') || 'system';
+  $('#themeSeg').innerHTML = [['system','themeSystem','monitor'],['light','themeLight','sun'],['dark','themeDark','moon']]
+    .map(([v,k,ic]) => `<button data-v="${v}" class="${th===v?'on':''}">${icon(ic)}${esc(t(k))}</button>`).join('');
+  $('#themeSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    localStorage.setItem('pe_theme', b.dataset.v); applyTheme(); renderSettings();
+  });
+
+  $('#langSeg').innerHTML = [['zh','繁中'],['en','English']]
+    .map(([v,l]) => `<button data-v="${v}" class="${lang===v?'on':''}">${esc(l)}</button>`).join('');
+  $('#langSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
+    lang = b.dataset.v; localStorage.setItem('pe_lang', lang);
+    applyStaticText(); renderTabs(); render();
+  });
+
+  const bioOn = bioEnabled();
+  $('#labBio').innerHTML = icon('shield') + esc(t('bio')) +
+    `<span class="sw ${bioOn ? 'on' : ''}" id="bioSw"><i></i></span>`;
+  $('#bioSub').textContent = t('bioOn');
+  $('#bioSw').onclick = async () => {
+    if (bioEnabled()) {
+      localStorage.removeItem('pe_bio'); localStorage.removeItem('pe_bio_id');
+      renderSettings();
+      return;
+    }
+    try { await bioRegister(); toast(t('bioSet')); }
+    catch (e) { toast(e.name === 'NotAllowedError' ? t('bioFail') : t('bioUnsupported')); }
+    renderSettings();
+  };
+
+  // 匯率表：改這裡只影響「之後」記的帳，每筆記錄都存了當時用的匯率
+  $('#rateRows').innerHTML = Object.keys(DEFAULT_RATES).map(c => `
+    <div class="rrow"><span class="rc">${esc(c)}</span>
+      <input data-c="${esc(c)}" inputmode="decimal" value="${esc(rateOf(c))}">
+      <span class="eq">TWD</span></div>`).join('') +
+    `<div class="sub">${esc(t('rateNote'))}</div>`;
+  $('#rateRows').querySelectorAll('input').forEach(i => i.onchange = () => {
+    const v = parseFloat(i.value);
+    if (v > 0) { rates[i.dataset.c] = v; save('pe_rates', rates); }
+    else i.value = rateOf(i.dataset.c);
+  });
+
+  $('#tplRows').innerHTML = (templates.length ? templates.map((x, i) => `
+    <div class="tplrow">
+      <span class="cicon" style="width:32px;height:32px;border-radius:10px;background:${CAT_META[x.category].c}1f;color:${CAT_META[x.category].c}">${icon(CAT_META[x.category].ic)}</span>
+      <span class="ti"><div class="tn">${esc(x.name)}</div>
+        <div class="tm">${esc(t(x.type === '收入' ? 'income' : 'expense'))} · ${esc(catName(x.category))}${x.payment ? ' · ' + esc(payName(x.payment)) : ''}</div></span>
+      <span class="ta">${x.amount ? nf(x.amount) : '–'}</span>
+      <button class="tx" data-i="${i}">${icon('x')}</button></div>`).join('') : '') +
+    `<button class="addbtn" id="tplAdd">${icon('plus')}${esc(t('tplAdd'))}</button>
+     <div class="sub">${esc(t('tplNote'))}</div>`;
+  $('#tplRows').querySelectorAll('.tx').forEach(b => b.onclick = () => {
+    templates.splice(+b.dataset.i, 1); save('pe_tpl', templates); renderSettings(); renderEntry();
+  });
+  $('#tplAdd').onclick = openTemplateSheet;
+
+  $('#labVer').innerHTML = icon('box') + esc(t('ver')) +
+    `<button class="upbtn" id="upBtn">${icon('refresh')}</button>` +
+    `<span class="val">${VERSION} · ${BUILD}</span>`;
+  $('#upBtn').onclick = async () => {
+    // 清快取＋汰換 Service Worker＋重新載入，一鍵套用新版本
+    if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k);
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+    }
+    location.reload();
+  };
+}
+
+function openTemplateSheet() {
+  let tType = '支出', tCat = '住', tPay = '轉帳';
+  openSheet(`
+    <div class="sheet-head"><h3>${esc(t('tplAdd'))}</h3>
+      <button class="xbtn" id="shClose">${icon('x')}</button></div>
+    <div class="formrow"><label>${esc(t('tplName'))}</label><input id="tName" placeholder="${esc(t('namePh'))}"></div>
+    <div class="formrow"><label>${esc(t('tplAmt'))}</label><input id="tAmt" inputmode="decimal" placeholder="0"></div>
+    <div class="formrow"><label>${esc(t('fType'))}</label><div class="grid c2" id="tType"></div></div>
+    <div class="formrow"><label>${esc(t('fCat'))}</label><div class="grid c3" id="tCat"></div></div>
+    <div class="formrow"><label>${esc(t('pay'))}</label><div class="grid c3" id="tPay"></div></div>
+    <div class="sheetbtns"><button class="save" id="tSave">${icon('check')}${esc(t('save'))}</button></div>`);
+  const draw = () => {
+    chipRow($('#tType'), ['支出', '收入'], x => tType === x, v => {
+      tType = v;
+      if (!(v === '收入' ? INCOME_CATS : EXPENSE_CATS).includes(tCat)) tCat = (v === '收入' ? INCOME_CATS : EXPENSE_CATS)[0];
+      draw();
+    }, x => esc(t(x === '收入' ? 'income' : 'expense')));
+    chipRow($('#tCat'), tType === '收入' ? INCOME_CATS : EXPENSE_CATS, x => tCat === x,
+      v => { tCat = v; draw(); }, x => icon(CAT_META[x].ic) + esc(catName(x)));
+    chipRow($('#tPay'), PAYMENTS, x => tPay === x, v => { tPay = v; draw(); }, x => esc(payName(x)));
+  };
+  draw();
+  $('#shClose').onclick = closeSheet;
+  $('#tSave').onclick = () => {
+    const name = $('#tName').value.trim();
+    if (!name) return toast(t('tplNameNeed'));
+    templates.push({ name, amount: parseFloat($('#tAmt').value) || 0, type: tType, category: tCat, payment: tPay });
+    save('pe_tpl', templates);
+    closeSheet(); renderSettings(); renderEntry();
+  };
+}
+
+// ================= 靜態文字與視圖分派 =================
+function applyStaticText() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+  $('#appTitle').textContent = t('appName');
+  $('#topLogo').innerHTML = icon('wallet');
+  $('#userPill').innerHTML = icon('user') + esc(me);
+  document.title = t('appName');
+}
+
+function renderView(v) {
+  if (v === 'entry') renderEntry();
+  else if (v === 'list') renderList();
+  else if (v === 'stats') renderStats();
+  else if (v === 'settings') renderSettings();
+}
+function render() { renderView(curView); }
+
+// ================= 啟動 =================
+async function boot() {
+  applyStaticText();
+  renderTabs();
+  render();
+  try {
+    // 統計頁的「與上月比較」需要上個月的資料，一併預抓
+    await Promise.all([ensureMonth(thisMonth()), loadSummary()]);
+    const prev = shiftMonth(thisMonth(), -1);
+    await ensureMonth(prev).catch(() => {});
+    render();
+    flushQueue();
+  } catch (e) {
+    toast(t('offline') + e.message);
+  }
+}
+
+function bindEvents() {
+  $('#loginBtn').onclick = doLogin;
+  $('#codeInput').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+  $('#bioBtn').onclick = tryBio;
+  $('#codeAlt').onclick = () => {
+    $('#codeHint').classList.remove('hidden');
+    $('#codeInput').classList.remove('hidden');
+    $('#loginBtn').classList.remove('hidden');
+    $('#codeAlt').classList.add('hidden');
+    $('#codeInput').focus();
+  };
+
+  $('#submitBtn').onclick = submitEntry;
+  $('#curMore').onclick = () => { curExpanded = !curExpanded; renderEntryChips(); };
+  $('#rateInput').oninput = () => { renderAmt(); renderRateRow(); };
+  $('#scanCamBtn').onclick = () => $('#scanFileCam').click();
+  $('#scanAlbumBtn').onclick = () => $('#scanFile').click();
+  $('#scanFileCam').onchange = e => { doScan(e.target.files[0]); e.target.value = ''; };
+  $('#scanFile').onchange = e => { doScan(e.target.files[0]); e.target.value = ''; };
+
+  const goMonth = async (which, delta) => {
+    const cur = which === 'list' ? listMonth : statsMonth;
+    const next = shiftMonth(cur, delta);
+    if (next > thisMonth()) return;
+    if (which === 'list') listMonth = next; else statsMonth = next;
+    try {
+      await ensureMonth(next);
+      if (which === 'stats') await ensureMonth(shiftMonth(next, -1)).catch(() => {});
+    } catch (e) { toast(t('offline') + e.message); }
+    render();
+  };
+  $('#mPrev').onclick = () => goMonth('list', -1);
+  $('#mNext').onclick = () => goMonth('list', 1);
+  $('#sPrev').onclick = () => goMonth('stats', -1);
+  $('#sNext').onclick = () => goMonth('stats', 1);
+
+  $('#filterBtn').onclick = openFilterSheet;
+  $('#refreshBtn').onclick = async () => {
+    try {
+      await loadMonth(listMonth, true);
+      summaryCache = null;
+      await loadSummary(true);
+      render();
+      toast(t('refreshed'));
+    } catch (e) { toast(t('offline') + e.message); }
+  };
+  $('#logoutBtn').onclick = () => logout(true);
+  $('#userPill').onclick = () => switchView('settings');
+  $('#sheetWrap').onclick = e => { if (e.target.id === 'sheetWrap') closeSheet(); };
+
+  // 跟手換頁
+  const main = document.querySelector('main');
+  main.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    pagerStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+  }, { passive: true });
+  main.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    pagerMove(e.touches[0].clientX, e.touches[0].clientY, e);
+  }, { passive: false });
+  main.addEventListener('touchend', pagerEnd, { passive: true });
+  main.addEventListener('touchcancel', pagerEnd, { passive: true });
+
+  addEventListener('online', flushQueue);
+  // 回到前景時把當月資料重抓一次（30 秒節流），這樣在 Notion 那邊改的東西也會同步過來
+  let lastFg = 0;
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden || !me || Date.now() - lastFg < 30000) return;
+    lastFg = Date.now();
+    try { await loadMonth(listMonth, true); summaryCache = null; await loadSummary(true); render(); } catch {}
+  });
+}
+
+function init() {
+  applyTheme();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  bindEvents();
+  if (!me || !myCode) showLogin(false);
+  else if (bioEnabled()) showLogin(true);
+  else boot();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+init();
+</script>
+</body>
+</html>
