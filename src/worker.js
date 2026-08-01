@@ -424,15 +424,19 @@ async function handleScan(req, env, mock) {
 
   const call = (model) => fetch(GEMINI, {
     method: 'POST',
-    headers: { 'authorization': `Bearer ${env.GEMINI_API_KEY}`, 'content-type': 'application/json' },
+    // AI Studio 的 API key 要走 x-goog-api-key。用 Authorization: Bearer 會被當成 OAuth token
+    // 而回 401「Expected OAuth 2 access token」——實測踩過，別改回去。
+    headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'content-type': 'application/json' },
     body: JSON.stringify({
       model,
       input: [
         { type: 'text', text: prompt },
         { type: 'image', data: image, mime_type: mime || 'image/jpeg' }
       ],
-      response_format: { type: 'json_schema', json_schema: { name: 'Receipt', schema } },
-      temperature: 0
+      // 結構化輸出的正確形狀（見 ai.google.dev/gemini-api/docs/structured-output）：
+      // type 是 'text'、mime_type 指定 application/json、schema 放 JSON Schema。
+      // 不是 OpenAI 那種 {type:'json_schema', json_schema:{...}} 的包裝。
+      response_format: { type: 'text', mime_type: 'application/json', schema }
     })
   });
 

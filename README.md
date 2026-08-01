@@ -147,8 +147,15 @@ npm run deploy
   建立頁面的 parent 要用 `{type:"data_source_id", data_source_id:...}`。
   database ID 與 data source ID 不能互換使用。
 - **Gemini Interactions API**：2026-06 GA 後取代 `generateContent` 成為預設介面。
-  認證改用 `Authorization: Bearer`，結構化輸出改用 `response_format.json_schema`，
-  模型輸出在 `steps[].content[].text`。程式裡保留了模型鏈：遇 429／503／404 自動換下一個模型重打同一個請求。
+  端點 `POST /v1beta/interactions`，模型輸出在 `steps[].content[].text`。
+  程式裡保留了模型鏈：遇 429／503／404 自動換下一個模型重打同一個請求。
+  兩個容易踩錯的地方（都實測踩過）：
+  - **認證用 `x-goog-api-key` 標頭**。AI Studio 的 API key 用 `Authorization: Bearer` 會被當成 OAuth token，
+    回 401「Expected OAuth 2 access token」。
+  - **結構化輸出是 `response_format: {type:'text', mime_type:'application/json', schema:{...}}`**，
+    不是 OpenAI 風格的 `{type:'json_schema', json_schema:{...}}`。另外 `temperature` 不是這個 API 的頂層參數。
+- **Cloudflare 部署後約有 10～20 秒的傳播時間**。改完馬上測會打到舊版，看起來像「改了沒效」——
+  驗證腳本要留緩衝或做重試。
 - **編輯與刪除前會先讀回原記錄**，這樣才知道要讓「哪一個月」的快取失效 —— 編輯有可能把日期改到別的月份。
   多一次 API 呼叫，但編輯是低頻操作，換來快取不會殘留舊值。
 - **前端所有選項值都會在 Worker 端過白名單**，前端就算被改也污染不了 Notion 的 select 選項。
