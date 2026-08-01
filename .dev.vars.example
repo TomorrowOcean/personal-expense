@@ -1,0 +1,12 @@
+# 複製這個檔案成 .dev.vars（已被 .gitignore 擋住，不會進版控）
+#
+# MOCK=1 時完全不碰 Notion，使用 worker.js 內建的假資料，適合開發前端。
+MOCK=1
+
+# 通行碼：JSON 格式 {"名字":"通行碼"}；正式環境用 wrangler secret 設定，不放這裡
+PASSCODES={"Jason":"000000"}
+
+# 以下只有在 MOCK=0（本地直連 Notion / Gemini）時才需要填：
+# NOTION_TOKEN=ntn_xxxxxxxxxxxx
+# NOTION_DS_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# GEMINI_API_KEY=xxxxxxxxxxxx

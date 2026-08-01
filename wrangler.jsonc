@@ -1,0 +1,27 @@
+{
+  // Cloudflare Worker：靜態網頁與 API 由同一個 Worker 服務，因此沒有 CORS 問題。
+  //
+  // 這個檔案會進版控，所以不放任何機密。Notion token、通行碼、Gemini key
+  // 以及 Notion data source ID 一律用 `wrangler secret put` 設定，見 README。
+  "name": "personal-expense",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    // 收據辨識的模型鏈（逗號分隔，依序嘗試）：遇 429 額度滿 / 503 服務忙 / 404 模型退役
+    // 就自動改用下一個模型重打同一個請求。模型 ID 以 ai.google.dev/gemini-api/docs/models 為準。
+    "GEMINI_MODELS": "gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite"
+  },
+  "kv_namespaces": [
+    {
+      // 月份查詢結果的快取；寫入記錄時自動失效該月。
+      // namespace id 是帳號內的識別碼，不是憑證——沒有 Cloudflare API token 拿它做不了任何事，
+      // 而 wrangler 部署時必須讀得到它，所以放在這裡而非 secret。
+      "binding": "CACHE",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ]
+}

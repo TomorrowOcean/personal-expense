@@ -1,0 +1,16 @@
+# 機密：本地開發環境變數（含通行碼、API token），絕不進版控
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# 相依套件與建置產物
+node_modules/
+.wrangler/
+dist/
+
+# 系統與編輯器
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

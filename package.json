@@ -1,0 +1,15 @@
+{
+  "name": "personal-expense",
+  "version": "1.0.0",
+  "description": "Personal expense & income tracker PWA backed by Notion, running on Cloudflare Workers",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "wrangler dev --port 8788",
+    "deploy": "wrangler deploy"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.110.0"
+  }
+}

@@ -1,0 +1,3 @@
+# 版控內一律存 LF，避免跨平台協作時整檔顯示為變更
+* text=auto eol=lf
+*.png binary
