@@ -476,7 +476,7 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 
 <script>
 'use strict';
-const VERSION = 'v1.1';
+const VERSION = 'v1.2';
 const BUILD = '2026-08-02';
 
 // ================= 圖示（SVG, 24x24 stroke） =================
@@ -1188,30 +1188,75 @@ async function submitEntry() {
 // ================= 收據辨識 =================
 // 照片在前端先壓到長邊 1280 的 JPEG 再上傳（省流量，順手把 iPhone 的 HEIC 轉掉），
 // 辨識完就丟，不存在任何地方。
-function compress(file) {
+const SCAN_MAX = 1280;
+
+// 把 canvas 轉成 base64 並立刻釋放它佔的記憶體
+function canvasToB64(c) {
+  const url = c.toDataURL('image/jpeg', 0.82);
+  const b64 = url.slice(url.indexOf(',') + 1);
+  c.width = c.height = 0;
+  return b64;
+}
+
+// 首選路徑：createImageBitmap 可以在「解碼階段」就把圖縮小，記憶體只跟輸出尺寸成正比。
+// 手機相機一張 4000x3000 的照片展開成點陣資料是 48MB，4800 萬畫素機種可達數百 MB，
+// 把原圖整張丟進 <img> 再畫到 canvas 就會觸發「記憶體不足」而讓分頁被系統回收。
+async function compressViaBitmap(file) {
+  // 小檔（截圖、已經壓過的圖）直接解碼就好：解碼成本本來就低，
+  // 而且指定 resizeWidth 會把小圖「放大」到 1280，檔案反而變肥又沒有多出任何資訊。
+  // 大檔才走 resize 解碼，只給 resizeWidth、高度依原始比例自動換算。
+  let bmp = file.size < 900 * 1024
+    ? await createImageBitmap(file)
+    : await createImageBitmap(file, { resizeWidth: SCAN_MAX, resizeQuality: 'medium' });
+  // 再檢查一次長邊：小檔可能尺寸仍大，直向圖也可能寬縮到 1280 後高度還超過
+  if (Math.max(bmp.width, bmp.height) > SCAN_MAX) {
+    const opt = bmp.width >= bmp.height ? { resizeWidth: SCAN_MAX } : { resizeHeight: SCAN_MAX };
+    const shorter = await createImageBitmap(bmp, { ...opt, resizeQuality: 'medium' });
+    bmp.close();
+    bmp = shorter;
+  }
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  bmp.close();
+  return canvasToB64(c);
+}
+
+// 備援路徑：瀏覽器不支援 createImageBitmap 或它的 resize 選項時才走這裡。
+// 這條路無法在解碼階段縮圖，記憶體用量較高，只當退路。
+function compressViaImg(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const scale = Math.min(1, SCAN_MAX / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
+      c.width = Math.round(img.naturalWidth * scale);
+      c.height = Math.round(img.naturalHeight * scale);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      resolve(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+      img.src = '';
+      resolve(canvasToB64(c));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image decode failed')); };
     img.src = url;
   });
 }
 
-async function doScan(file) {
+async function compress(file) {
+  if (window.createImageBitmap) {
+    try { return await compressViaBitmap(file); } catch { /* 落到備援路徑 */ }
+  }
+  return compressViaImg(file);
+}
+
+async function doScan(file, btn) {
   if (!file) return;
   const btns = [$('#scanCamBtn'), $('#scanAlbumBtn')];
   const html = btns.map(b => b.innerHTML);
   btns.forEach(b => { b.disabled = true; });
-  btns[0].innerHTML = '<span class="spin"></span>' + esc(t('scanning'));
+  // 載入動畫要出現在使用者剛剛按的那顆按鈕上，不能寫死第一顆
+  (btn || btns[0]).innerHTML = '<span class="spin"></span>' + esc(t('scanning'));
   try {
     const image = await compress(file);
     const d = await api('/scan', { method: 'POST', body: JSON.stringify({ image, mime: 'image/jpeg' }) });
@@ -1220,6 +1265,8 @@ async function doScan(file) {
     entryType = '支出';
     entryCur = x.currency;
     entryCat = EXPENSE_CATS.includes(x.category) ? x.category : '其他';
+    // 辨識不出付款方式時 payment 會是 null，這時保留使用者原本的選擇，不要用猜的覆蓋
+    if (PAYMENTS.includes(x.payment)) entryPay = x.payment;
     amtStr = String(x.amount);
     $('#nameInput').value = x.name || '';
     if (x.date) $('#dateInput').value = x.date;
@@ -1754,8 +1801,8 @@ function bindEvents() {
   $('#rateInput').oninput = () => { renderAmt(); renderRateRow(); };
   $('#scanCamBtn').onclick = () => $('#scanFileCam').click();
   $('#scanAlbumBtn').onclick = () => $('#scanFile').click();
-  $('#scanFileCam').onchange = e => { doScan(e.target.files[0]); e.target.value = ''; };
-  $('#scanFile').onchange = e => { doScan(e.target.files[0]); e.target.value = ''; };
+  $('#scanFileCam').onchange = e => { doScan(e.target.files[0], $('#scanCamBtn')); e.target.value = ''; };
+  $('#scanFile').onchange = e => { doScan(e.target.files[0], $('#scanAlbumBtn')); e.target.value = ''; };
 
   const goMonth = async (which, delta) => {
     const cur = which === 'list' ? listMonth : statsMonth;

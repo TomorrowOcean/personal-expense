@@ -392,19 +392,28 @@ async function handleScan(req, env, mock) {
   if (mock) {
     return json({
       ok: true,
-      data: { amount: 268, currency: 'TWD', name: '全家便利商店｜咖啡、御飯糰', category: '食', date: '2026-08-01' }
+      data: { amount: 268, currency: 'TWD', name: '全家便利商店｜咖啡、御飯糰', category: '食', payment: '刷卡', date: '2026-08-01' }
     });
   }
   if (!env.GEMINI_API_KEY) {
     return json({ error: 'GEMINI_API_KEY 尚未設定（wrangler secret put GEMINI_API_KEY）' }, 500);
   }
 
-  const prompt = `你是個人記帳助手。這張圖片是一張消費憑證，可能是任何國家的收據、發票、帳單、票券或訂單確認畫面。請抽取資訊，只輸出 JSON：
-- is_receipt：圖片若不是消費憑證（風景、人物、菜單看板等），設 false，其他欄位隨意
-- amount：實際支付的總金額。優先取「總計／合計／Total／税込」；絕對不要取小計、應付現金、找零、預付金額
-- currency：依憑證判斷幣別。台灣發票或收據為 TWD；日圓 JPY；美元 USD；歐元 EUR；韓元 KRW；人民幣 CNY。判斷不出來時給 TWD
-- name：格式「店名｜品項摘要」。店名保留原文；品項摘要列出主要品項最多 3 項，更多加「等」，例如「全家便利商店｜咖啡、御飯糰等」。水電瓦斯帳單寫「台電｜7月電費」這種形式
-- category：只能從這幾個選一：${EXPENSE_CATS.join('、')}。便利商店買食物飲料算「食」；車票、加油、停車、計程車算「行」；水電瓦斯、房租、家用品算「住」；藥局、診所、醫院算「醫療健康」；電影、遊戲、展覽算「娛樂」
+  const prompt = `你是個人記帳助手。這張圖片是一張消費憑證，可能是任何國家的收據、發票、帳單、票券、訂單確認畫面，或信用卡簽帳單。請抽取資訊，只輸出 JSON：
+- is_receipt：圖片若不是消費憑證（風景、人物、菜單看板等），設 false，其他欄位隨意。
+  注意：信用卡簽帳單（有商店代號、端末機代號、卡號、授權碼 APP.CODE、銷售 SALE 等欄位）也算消費憑證，設 true
+- amount：實際支付的總金額。優先取「合計／總計／AMT／Total／税込」；絕對不要取小計、應付現金、找零、預付金額
+- currency：依憑證判斷幣別。NT$／新台幣為 TWD；日圓 JPY；美元 USD；歐元 EUR；韓元 KRW；人民幣 CNY。判斷不出來時給 TWD
+- name：格式「店名｜品項摘要」。店名保留原文；品項摘要列出主要品項最多 3 項，更多加「等」，例如「全家便利商店｜咖啡、御飯糰等」。
+  水電瓦斯帳單寫「台電｜7月電費」這種形式。信用卡簽帳單通常只有店名沒有品項，那就只寫店名
+- category：只能從這幾個選一：${EXPENSE_CATS.join('、')}。便利商店買食物飲料算「食」；車票、加油、停車、計程車算「行」；水電瓦斯、房租、家用品算「住」；藥局、藥妝店、診所、醫院算「醫療健康」；電影、遊戲、展覽算「娛樂」
+- payment：付款方式，只能從這幾個選一：${PAYMENTS.join('、')}，真的看不出來才給「未知」。判斷依據：
+  出現 VISA／MasterCard／JCB／銀聯／卡號 CARD NO.／授權碼 APP.CODE／端末機代號／簽帳單／SALE 銷售 → 刷卡
+  出現 現金／CASH／找零／CHANGE／お預り → 現金
+  出現 LINE Pay／街口／悠遊付／Apple Pay／Google Pay／掃碼支付 → 行動支付
+  出現 悠遊卡／一卡通／icash 感應扣款 → 悠遊卡
+  出現 禮物卡／儲值卡／餘額扣款 → 儲值卡
+  出現 轉帳／匯款／ATM → 轉帳
 - date：憑證上的消費日期，格式 YYYY-MM-DD，讀不到就 null`;
 
   // 結構化輸出：用 response_format 的 json_schema 鎖死欄位與型別，
@@ -417,9 +426,12 @@ async function handleScan(req, env, mock) {
       currency: { type: 'string', enum: CURRENCIES },
       name: { type: 'string' },
       category: { type: 'string', enum: EXPENSE_CATS },
+      // 「未知」是刻意留的出口：與其讓模型硬猜一個付款方式，不如回未知、
+      // 前端保留使用者原本的選擇，不要拿錯的值覆蓋掉
+      payment: { type: 'string', enum: [...PAYMENTS, '未知'] },
       date: { type: ['string', 'null'] }
     },
-    required: ['is_receipt', 'amount', 'currency', 'name', 'category']
+    required: ['is_receipt', 'amount', 'currency', 'name', 'category', 'payment']
   };
 
   const call = (model) => fetch(GEMINI, {
@@ -466,6 +478,7 @@ async function handleScan(req, env, mock) {
       currency: CURRENCIES.includes(d.currency) ? d.currency : 'TWD',
       name: String(d.name || '').slice(0, 80),
       category: EXPENSE_CATS.includes(d.category) ? d.category : '其他',
+      payment: PAYMENTS.includes(d.payment) ? d.payment : null, // null＝辨識不出，前端不覆蓋
       date: /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') ? d.date : null
     }
   });
