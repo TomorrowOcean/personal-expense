@@ -100,8 +100,10 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 .seg button{flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:9px 4px;
   border-radius:10px; font-size:13.5px; font-weight:700; color:var(--sub); transition:all .15s; white-space:nowrap}
 .seg button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.14)}
-.seg button.on.inc{color:var(--good)}
-.seg button.on.exp{color:var(--bad)}
+/* 修飾類別一律加 is- 前綴：純 .exp 是下面記錄列表的類別，撞名會讓按鈕吃到
+   列表列的 margin-bottom 與內距，整條 seg 平白長高 8px */
+.seg button.on.is-inc{color:var(--good)}
+.seg button.on.is-exp{color:var(--bad)}
 #amt{font-size:46px; font-weight:800; text-align:right; margin:14px 6px 0; min-height:56px; letter-spacing:-.02em; word-break:break-all; font-variant-numeric:tabular-nums}
 #amtSub{text-align:right; font-size:13px; color:var(--sub); min-height:18px; margin:0 6px 10px; font-variant-numeric:tabular-nums}
 #keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:9px}
@@ -161,7 +163,7 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 .exp .r{display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0}
 .exp .name{font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
 .exp .a{font-weight:800; font-size:15px; font-variant-numeric:tabular-nums; flex:0 0 auto}
-.exp .a.inc{color:var(--good)}
+.exp .a.is-inc{color:var(--good)}
 .exp .m{font-size:12px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
 .exp .s{font-size:11px; color:var(--sub); font-variant-numeric:tabular-nums; flex:0 0 auto}
 .badge{display:inline-flex; align-items:center; font-size:10.5px; font-weight:700; border-radius:6px; padding:2px 6px; margin-left:6px}
@@ -176,7 +178,7 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 .sum3 .s1{text-align:center; padding:6px 2px}
 .sum3 .sl{font-size:11.5px; color:var(--sub); font-weight:700; letter-spacing:.03em}
 .sum3 .sv{font-size:19px; font-weight:800; margin-top:5px; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
-.sum3 .sv.inc{color:var(--good)} .sum3 .sv.exp{color:var(--bad)}
+.sum3 .sv.is-inc{color:var(--good)} .sum3 .sv.is-exp{color:var(--bad)}
 .cmp{display:flex; align-items:center; justify-content:center; gap:5px; font-size:11px; font-weight:700; margin-top:4px; color:var(--sub)}
 .cmp svg{width:11px; height:11px}
 .cmp.up{color:var(--bad)} .cmp.down{color:var(--good)} .cmp.flat{color:var(--sub)}
@@ -964,7 +966,7 @@ const catsOf = () => (entryType === '收入' ? INCOME_CATS : EXPENSE_CATS);
 const rateOf = c => (c === 'TWD' ? 1 : (Number(rates[c]) || DEFAULT_RATES[c] || 1));
 
 function renderTypeSeg() {
-  $('#typeSeg').innerHTML = [['支出', 'expense', 'exp'], ['收入', 'income', 'inc']]
+  $('#typeSeg').innerHTML = [['支出', 'expense', 'is-exp'], ['收入', 'income', 'is-inc']]
     .map(([v, k, cls]) => `<button data-v="${v}" class="${entryType === v ? 'on ' + cls : ''}">${esc(t(k))}</button>`).join('');
   $('#typeSeg').querySelectorAll('button').forEach(b => b.onclick = () => {
     entryType = b.dataset.v;
@@ -1271,7 +1273,7 @@ function renderList() {
           <span class="cicon" style="background:${meta.c}1f; color:${meta.c}">${icon(meta.ic)}</span>
           <span class="rows">
             <span class="r"><span class="name">${esc(r.name || '—')}${r.pending ? `<span class="badge queue">${esc(t('pending'))}</span>` : ''}${r.excluded ? `<span class="badge skip">${esc(t('excl'))}</span>` : ''}</span>
-              <span class="a ${isInc ? 'inc' : ''}">${isInc ? '+' : ''}NT$${nf(r.twd || 0)}</span></span>
+              <span class="a ${isInc ? 'is-inc' : ''}">${isInc ? '+' : ''}NT$${nf(r.twd || 0)}</span></span>
             <span class="r"><span class="m">${esc(catName(r.category))}${sub ? ' · ' + esc(sub) : ''}</span>
               <span class="s">${String(r.date).slice(11, 16)}</span></span>
           </span></button>`;
@@ -1442,8 +1444,8 @@ function renderSummaryCard() {
     cmp = `<div class="cmp ${cls}">${icon(ic)}${sign}${Math.abs(pct)}% · ${esc(t('vsLast'))}</div>`;
   }
   $('#sumCard').innerHTML = `<div class="sum3">
-      <div class="s1"><div class="sl">${esc(t('stIncome'))}</div><div class="sv inc">${nf(cur.income)}</div></div>
-      <div class="s1"><div class="sl">${esc(t('stExpense'))}</div><div class="sv exp">${nf(cur.expense)}</div>${cmp}</div>
+      <div class="s1"><div class="sl">${esc(t('stIncome'))}</div><div class="sv is-inc">${nf(cur.income)}</div></div>
+      <div class="s1"><div class="sl">${esc(t('stExpense'))}</div><div class="sv is-exp">${nf(cur.expense)}</div>${cmp}</div>
       <div class="s1"><div class="sl">${esc(t('stNet'))}</div><div class="sv" style="color:${net < 0 ? 'var(--bad)' : 'var(--ink)'}">${nf(net)}</div></div>
     </div>`;
 }
@@ -1773,18 +1775,21 @@ function bindEvents() {
   $('#userPill').onclick = () => switchView('settings');
   $('#sheetWrap').onclick = e => { if (e.target.id === 'sheetWrap') closeSheet(); };
 
-  // 跟手換頁
-  const main = document.querySelector('main');
-  main.addEventListener('touchstart', e => {
+  // 跟手換頁：監聽掛在 body 而不是 main。
+  // 內容很少時（例如記錄頁一筆都沒有）main 只有幾百 px 高，畫面下半部的空白屬於 body，
+  // 掛在 main 上的話手指放在那片空白就完全滑不動——排除清單已經擋掉輸入框、
+  // 橫向捲動區、抽屜與登入頁，掛 body 不會誤觸。
+  const surface = document.body;
+  surface.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     pagerStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
   }, { passive: true });
-  main.addEventListener('touchmove', e => {
+  surface.addEventListener('touchmove', e => {
     if (e.touches.length !== 1) return;
     pagerMove(e.touches[0].clientX, e.touches[0].clientY, e);
   }, { passive: false });
-  main.addEventListener('touchend', pagerEnd, { passive: true });
-  main.addEventListener('touchcancel', pagerEnd, { passive: true });
+  surface.addEventListener('touchend', pagerEnd, { passive: true });
+  surface.addEventListener('touchcancel', pagerEnd, { passive: true });
 
   addEventListener('online', flushQueue);
   // 回到前景時把當月資料重抓一次（30 秒節流），這樣在 Notion 那邊改的東西也會同步過來
