@@ -476,8 +476,8 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 
 <script>
 'use strict';
-const VERSION = 'v1.2';
-const BUILD = '2026-08-02';
+const VERSION = 'v1.3';
+const BUILD = '2026-08-05';
 
 // ================= 圖示（SVG, 24x24 stroke） =================
 const P = {
@@ -972,7 +972,12 @@ let entryCat = '食';
 let entryPay = '現金';
 let entryCur = 'TWD';
 let curExpanded = false;
+// 忙碌狀態一律存成 state，讓 render() 每次都能畫出「當下真正的樣子」。
+// 直接把 spinner 塞進 innerHTML、事後再塞回快照的寫法會跟 render() 打架：
+// 回前景重抓資料那類背景流程也會呼叫 render()，就把還在跑的動畫洗成一般標籤。
 let submitting = false;
+let scanBusy = false;
+let scanBusyBtn = 'scanCamBtn'; // 動畫要出現在使用者剛剛按的那顆按鈕上，不能寫死第一顆
 
 const catsOf = () => (entryType === '收入' ? INCOME_CATS : EXPENSE_CATS);
 const rateOf = c => (c === 'TWD' ? 1 : (Number(rates[c]) || DEFAULT_RATES[c] || 1));
@@ -1106,6 +1111,22 @@ function renderEntryTotals() {
   $('#monthTotal').textContent = 'NT$' + nf(monTotal);
 }
 
+function renderScanBtns() {
+  for (const [id, ic, k] of [['scanCamBtn', 'camera', 'scanCam'], ['scanAlbumBtn', 'image', 'scanAlbum']]) {
+    const b = $('#' + id);
+    b.disabled = scanBusy;
+    b.innerHTML = scanBusy && id === scanBusyBtn
+      ? '<span class="spin"></span>' + esc(t('scanning'))
+      : icon(ic) + esc(t(k));
+  }
+}
+
+function renderSubmitBtn() {
+  const b = $('#submitBtn');
+  b.disabled = submitting;
+  b.innerHTML = submitting ? '<span class="spin"></span>' : icon('check') + esc(t('submit'));
+}
+
 function renderEntry() {
   $('#lblCat').textContent = t('cat');
   $('#lblPay').textContent = t('pay');
@@ -1114,9 +1135,7 @@ function renderEntry() {
   $('#lblExclHint').textContent = t('exclHint');
   $('#nameInput').placeholder = t('namePh');
   $('#noteInput').placeholder = t('notePh');
-  $('#submitBtn').innerHTML = icon('check') + esc(t('submit'));
-  $('#scanCamBtn').innerHTML = icon('camera') + esc(t('scanCam'));
-  $('#scanAlbumBtn').innerHTML = icon('image') + esc(t('scanAlbum'));
+  renderSubmitBtn(); renderScanBtns();
   if (!$('#dateInput').value) $('#dateInput').value = todayStr();
   renderTypeSeg(); renderKeypad(); renderAmt(); renderEntryChips();
   renderAdv(); renderTemplates(); renderRecent(); renderEntryTotals();
@@ -1157,7 +1176,7 @@ async function submitEntry() {
   });
 
   submitting = true;
-  $('#submitBtn').innerHTML = '<span class="spin"></span>';
+  renderSubmitBtn();
   try {
     const d = await api('/expenses', { method: 'POST', body: JSON.stringify(rec) });
     const created = d.expense;
@@ -1180,7 +1199,7 @@ async function submitEntry() {
     else toast(t('failed') + e.message);
   } finally {
     submitting = false;
-    $('#submitBtn').innerHTML = icon('check') + esc(t('submit'));
+    renderSubmitBtn(); // 送出途中換了分頁的話 render() 不會走到記帳頁，這裡直接還原
     render();
   }
 }
@@ -1250,13 +1269,11 @@ async function compress(file) {
   return compressViaImg(file);
 }
 
-async function doScan(file, btn) {
-  if (!file) return;
-  const btns = [$('#scanCamBtn'), $('#scanAlbumBtn')];
-  const html = btns.map(b => b.innerHTML);
-  btns.forEach(b => { b.disabled = true; });
-  // 載入動畫要出現在使用者剛剛按的那顆按鈕上，不能寫死第一顆
-  (btn || btns[0]).innerHTML = '<span class="spin"></span>' + esc(t('scanning'));
+async function doScan(file, btnId) {
+  if (!file || scanBusy) return;
+  scanBusy = true;
+  scanBusyBtn = btnId || 'scanCamBtn';
+  renderScanBtns();
   try {
     const image = await compress(file);
     const d = await api('/scan', { method: 'POST', body: JSON.stringify({ image, mime: 'image/jpeg' }) });
@@ -1276,7 +1293,8 @@ async function doScan(file, btn) {
   } catch (e) {
     toast(t('scanErr') + e.message);
   } finally {
-    btns.forEach((b, i) => { b.disabled = false; b.innerHTML = html[i]; });
+    scanBusy = false;
+    renderScanBtns();
   }
 }
 // ================= 記錄頁 =================
@@ -1801,8 +1819,8 @@ function bindEvents() {
   $('#rateInput').oninput = () => { renderAmt(); renderRateRow(); };
   $('#scanCamBtn').onclick = () => $('#scanFileCam').click();
   $('#scanAlbumBtn').onclick = () => $('#scanFile').click();
-  $('#scanFileCam').onchange = e => { doScan(e.target.files[0], $('#scanCamBtn')); e.target.value = ''; };
-  $('#scanFile').onchange = e => { doScan(e.target.files[0], $('#scanAlbumBtn')); e.target.value = ''; };
+  $('#scanFileCam').onchange = e => { doScan(e.target.files[0], 'scanCamBtn'); e.target.value = ''; };
+  $('#scanFile').onchange = e => { doScan(e.target.files[0], 'scanAlbumBtn'); e.target.value = ''; };
 
   const goMonth = async (which, delta) => {
     const cur = which === 'list' ? listMonth : statsMonth;
@@ -1868,7 +1886,10 @@ function bindEvents() {
   // 回到前景時把當月資料重抓一次（30 秒節流），這樣在 Notion 那邊改的東西也會同步過來
   let lastFg = 0;
   document.addEventListener('visibilitychange', async () => {
-    if (document.hidden || !me || Date.now() - lastFg < 30000) return;
+    // 掃描或送出還在跑就跳過：使用者正在填的東西不需要現在同步，
+    // 也不必跟進行中的請求搶頻寬。（從相機／相簿回來時 change 不一定比這裡早，
+    // 所以這條只是順手省事，動畫不會被洗掉是靠 render 由 state 決定按鈕內容。）
+    if (document.hidden || !me || scanBusy || submitting || Date.now() - lastFg < 30000) return;
     lastFg = Date.now();
     try { await loadMonth(listMonth, true); summaryCache = null; await loadSummary(true); render(); } catch {}
   });
