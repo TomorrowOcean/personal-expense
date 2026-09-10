@@ -114,6 +114,10 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
   transition:transform .08s, background .15s; display:flex; align-items:center; justify-content:center}
 #keypad button:active{transform:scale(.93); background:var(--chip)}
 .textrow{margin-top:9px}
+/* 日期、時間並排且等寬：中文介面的時間是 12 小時制「上午 12:07」，其實跟日期差不多長，
+   給窄一點就會被截斷。min-width:0 讓兩欄在窄螢幕都能縮，不會互相擠出去 */
+.dtrow{display:flex; gap:9px}
+.dtrow input{flex:1; min-width:0}
 #submitBtn{width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
   background:linear-gradient(135deg,var(--accent),var(--accent2)); color:var(--on-accent);
   font-size:17px; font-weight:800; border-radius:16px; padding:16px 0; margin-top:16px;
@@ -400,7 +404,7 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 
       <div class="textrow"><input id="nameInput" autocomplete="off"></div>
       <div class="textrow"><input id="noteInput" autocomplete="off"></div>
-      <div class="textrow"><input id="dateInput" type="date"></div>
+      <div class="textrow dtrow"><input id="dateInput" type="date"><input id="timeInput" type="time"></div>
 
       <div id="advWrap" class="advwrap hidden"></div>
 
@@ -476,8 +480,8 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 
 <script>
 'use strict';
-const VERSION = 'v1.3';
-const BUILD = '2026-08-05';
+const VERSION = 'v1.4';
+const BUILD = '2026-09-11';
 
 // ================= 圖示（SVG, 24x24 stroke） =================
 const P = {
@@ -547,7 +551,8 @@ const I18N = {
     allTypes:'全部', allPays:'全部', allCats:'全部',
     summary:(n,inc,exp)=>`${n} 筆 · 收 ${inc} · 支 ${exp}`,
     emptyList:'這個月還沒有記錄', pending:'待同步', pendingTip:'這筆還在離線佇列中，同步後才能編輯',
-    editTitle:'編輯記錄', fName:'項目名稱', fAmt:'金額', fCurL:'幣別', fRate:'匯率', fDt:'日期',
+    editTitle:'編輯記錄', fName:'項目名稱', fAmt:'金額', fCurL:'幣別', fRate:'匯率', fDt:'日期與時間',
+    dateL:'日期', timeL:'時間',
     fNote:'備註', save:'儲存', del:'刪除', updated:'已更新', deleted:'已刪除',
     delConfirm:s=>`確定刪除「${s}」？`, failed:'操作失敗：', offline:'無法連線：', relogin:'請重新登入',
     stIncome:'收入', stExpense:'支出', stNet:'結餘',
@@ -585,7 +590,8 @@ const I18N = {
     allTypes:'Any', allPays:'Any', allCats:'All',
     summary:(n,inc,exp)=>`${n} items · in ${inc} · out ${exp}`,
     emptyList:'No records this month', pending:'Pending', pendingTip:'Still in the offline queue — editable after sync',
-    editTitle:'Edit record', fName:'Item', fAmt:'Amount', fCurL:'Currency', fRate:'Rate', fDt:'Date',
+    editTitle:'Edit record', fName:'Item', fAmt:'Amount', fCurL:'Currency', fRate:'Rate', fDt:'Date & time',
+    dateL:'Date', timeL:'Time',
     fNote:'Note', save:'Save', del:'Delete', updated:'Updated', deleted:'Deleted',
     delConfirm:s=>`Delete "${s}"?`, failed:'Failed: ', offline:'Connection failed: ', relogin:'Please log in again',
     stIncome:'Income', stExpense:'Expenses', stNet:'Net',
@@ -664,14 +670,24 @@ function dayLabel(iso) {
   const d = new Date(iso);
   return I18N[lang].dayFmt(d.getMonth() + 1, d.getDate(), t('wd')[d.getDay()]);
 }
-// 把 <input type="date"> 的值配上現在的時分，存成帶時區的 ISO 字串
-function dateToISO(dateStr) {
-  const now = new Date();
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setHours(now.getHours(), now.getMinutes(), 0, 0);
-  const off = -d.getTimezoneOffset();
+function nowHM() { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+// 裝置在「那個日期時間」的時區偏移，寫成 +08:00 的形式（用那一刻去算，夏令時間才會對）
+function localOffset(dateStr, timeStr) {
+  const off = -new Date(`${dateStr}T${timeStr}:00`).getTimezoneOffset();
   const sign = off >= 0 ? '+' : '-';
-  return `${dateStr}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+  return `${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+}
+// 把 <input type="date"> 與 <input type="time"> 的值組成帶時區的 ISO 字串。
+// 沒給 off 就用裝置時區；編輯舊記錄時傳入原本的偏移——在日本記的帳回台灣改，
+// 當地時間與實際時刻才不會被偷偷換成 +08:00
+function toISO(dateStr, timeStr, off) {
+  return `${dateStr}T${timeStr}:00${off || localOffset(dateStr, timeStr)}`;
+}
+// 反過來把記錄的日期字串拆成兩個輸入框要的值，外加原本的時區偏移。
+// Notion 回來的形狀可能是 2026-07-20T13:10:00.000+09:00，也可能只有日期（在 Notion 手動建、沒填時間）
+function splitISO(iso) {
+  const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2})[^Z+-]*(Z|[+-]\d{2}:\d{2})?)?/.exec(String(iso || ''));
+  return m ? { date: m[1], time: m[2] || '', off: m[3] || '' } : { date: '', time: '', off: '' };
 }
 function nf(n) { return Math.round(n).toLocaleString('en-US'); }
 function money(n, cur = 'TWD') {
@@ -978,6 +994,9 @@ let curExpanded = false;
 let submitting = false;
 let scanBusy = false;
 let scanBusyBtn = 'scanCamBtn'; // 動畫要出現在使用者剛剛按的那顆按鈕上，不能寫死第一顆
+// 日期時間預設跟著時鐘走（每 10 秒與回到前景時對一次），手動改過日期或時間就停住，送出後恢復。
+// 順便解決 App 在背景放過夜、隔天打開日期還停在昨天的問題
+let dtFollow = true;
 
 const catsOf = () => (entryType === '收入' ? INCOME_CATS : EXPENSE_CATS);
 const rateOf = c => (c === 'TWD' ? 1 : (Number(rates[c]) || DEFAULT_RATES[c] || 1));
@@ -1006,6 +1025,7 @@ function renderKeypad() {
   $('#keypad').innerHTML = keys.map(k => `<button data-k="${k}">${k === '←' ? icon('chevl') : k}</button>`).join('');
   $('#keypad').querySelectorAll('button').forEach(b => b.onclick = () => {
     const k = b.dataset.k;
+    const before = amtStr;
     if (k === '←') amtStr = amtStr.slice(0, -1);
     else if (k === '.') { if (!amtStr.includes('.')) amtStr = (amtStr || '0') + '.'; }
     else if (k === '00') { if (amtStr) amtStr += '00'; }
@@ -1014,6 +1034,10 @@ function renderKeypad() {
       if (amtStr.replace('.', '').length >= 10) return;
       amtStr = amtStr === '0' ? k : amtStr + k;
     }
+    // 金額真的有變才震（位數滿了、空的再退格都不震），不震本身就是「沒輸入進去」的提示。
+    // 4ms 與北海道那版同樣手感；iOS Safari 沒有 vibrate，會直接略過
+    if (amtStr === before) return;
+    if (navigator.vibrate) navigator.vibrate(4);
     renderAmt();
   });
 }
@@ -1121,6 +1145,14 @@ function renderScanBtns() {
   }
 }
 
+function syncEntryDT() {
+  if (!dtFollow) return;
+  const a = document.activeElement;
+  if (a && (a.id === 'dateInput' || a.id === 'timeInput')) return; // 選擇器開著時別從底下把值換掉
+  $('#dateInput').value = todayStr();
+  $('#timeInput').value = nowHM();
+}
+
 function renderSubmitBtn() {
   const b = $('#submitBtn');
   b.disabled = submitting;
@@ -1135,8 +1167,10 @@ function renderEntry() {
   $('#lblExclHint').textContent = t('exclHint');
   $('#nameInput').placeholder = t('namePh');
   $('#noteInput').placeholder = t('notePh');
+  $('#dateInput').setAttribute('aria-label', t('dateL'));
+  $('#timeInput').setAttribute('aria-label', t('timeL'));
   renderSubmitBtn(); renderScanBtns();
-  if (!$('#dateInput').value) $('#dateInput').value = todayStr();
+  syncEntryDT();
   renderTypeSeg(); renderKeypad(); renderAmt(); renderEntryChips();
   renderAdv(); renderTemplates(); renderRecent(); renderEntryTotals();
 }
@@ -1145,7 +1179,8 @@ function resetEntry() {
   amtStr = '';
   $('#nameInput').value = '';
   $('#noteInput').value = '';
-  $('#dateInput').value = todayStr();
+  dtFollow = true;
+  syncEntryDT();
   $('#exclInput').checked = false;
   entryCur = 'TWD';
   $('#advWrap').querySelectorAll('input').forEach(i => i.value = '');
@@ -1161,7 +1196,7 @@ async function submitEntry() {
 
   const rec = {
     name,
-    date: dateToISO($('#dateInput').value || todayStr()),
+    date: toISO($('#dateInput').value || todayStr(), $('#timeInput').value || nowHM()),
     type: entryType,
     amount,
     currency: entryCur,
@@ -1286,7 +1321,10 @@ async function doScan(file, btnId) {
     if (PAYMENTS.includes(x.payment)) entryPay = x.payment;
     amtStr = String(x.amount);
     $('#nameInput').value = x.name || '';
+    // 讀到什麼帶什麼：只有日期就保留欄位原本的時間。帶入後停止跟隨時鐘，免得被蓋回現在
     if (x.date) $('#dateInput').value = x.date;
+    if (x.time) $('#timeInput').value = x.time;
+    if (x.date || x.time) dtFollow = false;
     $('#rateInput').value = rateOf(entryCur);
     renderTypeSeg(); renderKeypad(); renderAmt(); renderEntryChips(); renderAdv();
     toast(t('scanned'));
@@ -1412,6 +1450,7 @@ function openFilterSheet() {
 function openEditSheet(r) {
   const allCats = [...EXPENSE_CATS, ...INCOME_CATS];
   let eCat = r.category, ePay = r.payment || '現金', eCur = r.currency, eType = r.type;
+  const dt = splitISO(r.date);
   openSheet(`
     <div class="sheet-head"><h3>${esc(t('editTitle'))}</h3>
       <button class="xbtn" id="shClose">${icon('x')}</button></div>
@@ -1423,7 +1462,9 @@ function openEditSheet(r) {
     <div class="formrow" id="eRateRow"><label>${esc(t('fRate'))}</label><input id="eRate" inputmode="decimal" value="${esc(r.rate)}"></div>
     <div class="formrow"><label>${esc(t('fCat'))}</label><div class="grid c3" id="eCat"></div></div>
     <div class="formrow"><label>${esc(t('pay'))}</label><div class="grid c3" id="ePay"></div></div>
-    <div class="formrow"><label>${esc(t('fDt'))}</label><input id="eDate" type="date" value="${String(r.date).slice(0, 10)}"></div>
+    <div class="formrow"><label>${esc(t('fDt'))}</label><div class="dtrow">
+      <input id="eDate" type="date" value="${dt.date}" aria-label="${esc(t('dateL'))}">
+      <input id="eTime" type="time" value="${dt.time}" aria-label="${esc(t('timeL'))}"></div></div>
     <div class="formrow"><label>${esc(t('fNote'))}</label><input id="eNote" value="${esc(r.note || '')}"></div>
     <label class="switchrow"><input type="checkbox" id="eExcl" ${r.excluded ? 'checked' : ''}><span>${esc(t('excl'))}</span></label>
     <div class="sheetbtns">
@@ -1451,13 +1492,15 @@ function openEditSheet(r) {
   $('#shClose').onclick = closeSheet;
 
   $('#eSave').onclick = async () => {
+    // 時間清空就存成純日期（Notion 的整天記錄），日期清空則沿用原本的
+    const eDay = $('#eDate').value || dt.date, eTime = $('#eTime').value;
     const body = {
       name: $('#eName').value.trim(),
       amount: parseFloat($('#eAmt').value) || 0,
       currency: eCur,
       rate: eCur === 'TWD' ? 1 : (parseFloat($('#eRate').value) || 1),
       type: eType, category: eCat, payment: ePay,
-      date: dateToISO($('#eDate').value),
+      date: eTime ? toISO(eDay, eTime, dt.off) : eDay,
       note: $('#eNote').value.trim(),
       excluded: $('#eExcl').checked
     };
@@ -1821,6 +1864,10 @@ function bindEvents() {
   $('#scanAlbumBtn').onclick = () => $('#scanFile').click();
   $('#scanFileCam').onchange = e => { doScan(e.target.files[0], 'scanCamBtn'); e.target.value = ''; };
   $('#scanFile').onchange = e => { doScan(e.target.files[0], 'scanAlbumBtn'); e.target.value = ''; };
+  for (const id of ['#dateInput', '#timeInput']) {
+    for (const ev of ['input', 'change']) $(id).addEventListener(ev, () => { dtFollow = false; });
+  }
+  setInterval(syncEntryDT, 10000);
 
   const goMonth = async (which, delta) => {
     const cur = which === 'list' ? listMonth : statsMonth;
@@ -1886,6 +1933,7 @@ function bindEvents() {
   // 回到前景時把當月資料重抓一次（30 秒節流），這樣在 Notion 那邊改的東西也會同步過來
   let lastFg = 0;
   document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden) syncEntryDT(); // 不受下面的節流限制，一回來就把時間對準
     // 掃描或送出還在跑就跳過：使用者正在填的東西不需要現在同步，
     // 也不必跟進行中的請求搶頻寬。（從相機／相簿回來時 change 不一定比這裡早，
     // 所以這條只是順手省事，動畫不會被洗掉是靠 render 由 state 決定按鈕內容。）

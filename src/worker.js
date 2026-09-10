@@ -392,7 +392,7 @@ async function handleScan(req, env, mock) {
   if (mock) {
     return json({
       ok: true,
-      data: { amount: 268, currency: 'TWD', name: '全家便利商店｜咖啡、御飯糰', category: '食', payment: '刷卡', date: '2026-08-01' }
+      data: { amount: 268, currency: 'TWD', name: '全家便利商店｜咖啡、御飯糰', category: '食', payment: '刷卡', date: '2026-08-01', time: '12:34' }
     });
   }
   if (!env.GEMINI_API_KEY) {
@@ -414,7 +414,8 @@ async function handleScan(req, env, mock) {
   出現 悠遊卡／一卡通／icash 感應扣款 → 悠遊卡
   出現 禮物卡／儲值卡／餘額扣款 → 儲值卡
   出現 轉帳／匯款／ATM → 轉帳
-- date：憑證上的消費日期，格式 YYYY-MM-DD，讀不到就 null`;
+- date：憑證上的消費日期，格式 YYYY-MM-DD，讀不到就 null
+- time：憑證上的消費時間，24 小時制 HH:MM（下午 2:05 寫 14:05），讀不到就 null。只印日期沒印時間也給 null，不要自己編一個`;
 
   // 結構化輸出：用 response_format 的 json_schema 鎖死欄位與型別，
   // 模型不可能回出多餘字句或缺欄位，不必只靠提示詞約束格式
@@ -429,7 +430,8 @@ async function handleScan(req, env, mock) {
       // 「未知」是刻意留的出口：與其讓模型硬猜一個付款方式，不如回未知、
       // 前端保留使用者原本的選擇，不要拿錯的值覆蓋掉
       payment: { type: 'string', enum: [...PAYMENTS, '未知'] },
-      date: { type: ['string', 'null'] }
+      date: { type: ['string', 'null'] },
+      time: { type: ['string', 'null'] }
     },
     required: ['is_receipt', 'amount', 'currency', 'name', 'category', 'payment']
   };
@@ -471,6 +473,10 @@ async function handleScan(req, env, mock) {
   try { d = JSON.parse(extractText(await gr.json())); } catch { return json({ ok: false, error: 'unrecognized' }); }
   if (!d || d.is_receipt === false || !(Number(d.amount) > 0)) return json({ ok: false, error: 'unrecognized' });
 
+  // 模型偶爾會回 9:05 或 14:05:33，收斂成 <input type="time"> 吃的 HH:MM；不合理的時刻一律當讀不到
+  const tm = /^(\d{1,2}):(\d{2})/.exec(d.time || '');
+  const time = tm && Number(tm[1]) < 24 && Number(tm[2]) < 60 ? `${tm[1].padStart(2, '0')}:${tm[2]}` : null;
+
   return json({
     ok: true,
     data: {
@@ -479,7 +485,8 @@ async function handleScan(req, env, mock) {
       name: String(d.name || '').slice(0, 80),
       category: EXPENSE_CATS.includes(d.category) ? d.category : '其他',
       payment: PAYMENTS.includes(d.payment) ? d.payment : null, // null＝辨識不出，前端不覆蓋
-      date: /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') ? d.date : null
+      date: /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') ? d.date : null,
+      time // null＝讀不到，前端保留欄位原本的時間
     }
   });
 }
