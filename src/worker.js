@@ -1,4 +1,4 @@
-// 個人記帳 Worker：驗證通行碼、轉發 Notion API、提供靜態網頁
+// 個人記帳 Worker：登入與 session、轉發 Notion API、提供靜態網頁
 //
 // Notion 使用 2025-09-03 版 API：database 是容器，實際資料掛在底下的 data source，
 // 因此查詢與建立頁面都以 NOTION_DS_ID（data source ID）為準，而非 database ID。
@@ -41,10 +41,10 @@ export default {
   }
 };
 
-function json(data, status = 200) {
+function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }
   });
 }
 
@@ -52,10 +52,48 @@ function codes(env) {
   try { return JSON.parse(env.PASSCODES || '{}'); } catch { return {}; }
 }
 
-function authed(req, env) {
-  const u = req.headers.get('x-user');
-  const c = req.headers.get('x-code');
-  return !!u && !!c && codes(env)[u] === c;
+// ---- 登入與 session ----
+// 通行碼只在 /api/login 出現一次（有 IP 與名字雙重節流），之後改用 128-bit 隨機 session id，
+// 放在 JavaScript 讀不到的 HttpOnly cookie。舊版每個請求都帶 x-code，
+// 等於任何資料端點都能拿來無限次暴力猜通行碼，登入端點的節流形同虛設。
+const COOKIE = '__Host-sid';
+const SESSION_DAYS = 180;
+
+function sameCode(a, b) {
+  const ea = new TextEncoder().encode(String(a)), eb = new TextEncoder().encode(String(b));
+  return ea.length === eb.length && crypto.subtle.timingSafeEqual(ea, eb);
+}
+
+async function sha16(s) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(h)].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getCookie(req, name) {
+  for (const part of (req.headers.get('cookie') || '').split(/;\s*/)) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i) === name) return part.slice(i + 1);
+  }
+  return null;
+}
+
+const sessionCookie = (sid, maxAge) => `${COOKIE}=${sid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+
+async function hits(env, key) { return Number(await env.CACHE.get(key)) || 0; }
+async function bump(env, key, ttl) { await env.CACHE.put(key, String(await hits(env, key) + 1), { expirationTtl: ttl }); }
+
+// session 記下登入當時通行碼的指紋：改掉某人的通行碼（或把他從 PASSCODES 拿掉），他所有裝置立刻失效
+async function currentUser(req, env) {
+  const sid = getCookie(req, COOKIE);
+  if (!sid || !/^[\w-]{16,64}$/.test(sid)) return null;
+  const s = await env.CACHE.get(`sess:${sid}`, 'json');
+  if (!s) return null;
+  const code = codes(env)[s.user];
+  if (code == null || s.pv !== await sha16(`${s.user} ${code}`)) {
+    await env.CACHE.delete(`sess:${sid}`);
+    return null;
+  }
+  return s.user;
 }
 
 // ---- 月份工具（一律以台北時間為準）----
@@ -116,23 +154,43 @@ async function handleApi(req, env, url) {
   const method = req.method;
   const mock = env.MOCK === '1';
 
-  // ---- 登入（唯一不需驗證的端點，因此加上以 IP 為單位的嘗試次數限制）----
-  if (path === '/api/login' && method === 'POST') {
-    const ip = req.headers.get('cf-connecting-ip') || 'unknown';
-    const rlKey = `rl:${ip}`;
-    const tries = Number(await cacheGet(env, rlKey)) || 0;
-    if (tries >= 10) return json({ error: '嘗試次數過多，請稍後再試' }, 429);
-
-    const { user, code } = await req.json();
-    if (codes(env)[user] === String(code)) {
-      await cacheDrop(env, [rlKey]);
-      return json({ ok: true, user });
-    }
-    await cachePut(env, rlKey, tries + 1, 3600);
-    return json({ error: '名字或通行碼不正確' }, 401);
+  // 會改變狀態的請求必須來自本站（SameSite=Lax 之外再加一道）
+  if (method !== 'GET') {
+    const origin = req.headers.get('origin');
+    if (origin && origin !== url.origin) return json({ error: '來源不符' }, 403);
   }
 
-  if (!authed(req, env)) return json({ error: 'unauthorized' }, 401);
+  // ---- 登入：唯一不需要 session 的端點。同一 IP 一小時錯 10 次、同一名字一小時錯 20 次就暫停 ----
+  if (path === '/api/login' && method === 'POST') {
+    const body = await req.json().catch(() => ({}));
+    const user = String(body.user || ''), code = String(body.code || '');
+    const ipKey = `rl:ip:${req.headers.get('cf-connecting-ip') || 'local'}`, userKey = `rl:user:${user}`;
+    if (await hits(env, ipKey) >= 10 || await hits(env, userKey) >= 20) {
+      return json({ error: '嘗試次數太多，請一小時後再試' }, 429);
+    }
+    const all = codes(env);
+    if (!Object.hasOwn(all, user) || !code || !sameCode(all[user], code)) {
+      await Promise.all([bump(env, ipKey, 3600), bump(env, userKey, 3600)]);
+      return json({ error: '名字或通行碼不正確' }, 401);
+    }
+    await Promise.all([env.CACHE.delete(ipKey), env.CACHE.delete(userKey)]);
+    const sid = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const expiration = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
+    await env.CACHE.put(`sess:${sid}`, JSON.stringify({ user, pv: await sha16(`${user} ${code}`) }), { expiration });
+    return json({ ok: true, user }, 200, { 'set-cookie': sessionCookie(sid, SESSION_DAYS * 86400) });
+  }
+
+  if (path === '/api/logout' && method === 'POST') {
+    const sid = getCookie(req, COOKIE);
+    if (sid && /^[\w-]{16,64}$/.test(sid)) await env.CACHE.delete(`sess:${sid}`);
+    return json({ ok: true }, 200, { 'set-cookie': sessionCookie('', 0) });
+  }
+
+  const me = await currentUser(req, env);
+  if (!me) return json({ error: 'unauthorized' }, 401, { 'set-cookie': sessionCookie('', 0) });
+
+  if (path === '/api/me' && method === 'GET') return json({ user: me });
 
   // ---- 讀取某個月的記錄 ----
   if (path === '/api/expenses' && method === 'GET') {
@@ -197,7 +255,7 @@ async function handleApi(req, env, url) {
   // ---- 新增一筆（記錄者一律以登入身分為準，不接受前端指定）----
   if (path === '/api/expenses' && method === 'POST') {
     const e = normalize(await req.json());
-    e.creator = req.headers.get('x-user');
+    e.creator = me;
 
     let created;
     if (mock) {

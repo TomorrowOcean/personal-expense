@@ -24,9 +24,9 @@
 
 ```
 手機 PWA（public/index.html，單檔無框架）
-   ↓ fetch /api/*（x-user / x-code 標頭驗證）
+   ↓ fetch /api/*（HttpOnly session cookie 驗證）
 Cloudflare Worker（src/worker.js）
-   ├─ Cloudflare KV：月份查詢結果快取
+   ├─ Cloudflare KV：月份查詢結果快取、session、登入節流
    ├─ Notion API 2025-09-03：讀寫收支記錄
    └─ Gemini Interactions API：收據辨識
 Notion database「個人收支記錄」
@@ -34,6 +34,8 @@ Notion database「個人收支記錄」
 
 - 前後端由同一個 Worker 服務（靜態資源 + API），沒有 CORS 問題
 - Notion token、通行碼、Gemini key 只存在 Cloudflare secret，前端程式碼不含任何機密
+- 通行碼只在登入時傳一次（同 IP 一小時錯 10 次、同名字錯 20 次就暫停），之後憑 HttpOnly session cookie（180 天）
+- **撤銷所有已登入的裝置**：換掉 `PASSCODES` 裡的通行碼即可，所有裝置會立刻登出
 - **按月查詢**而非一次抓全部：個人帳跑好幾年、累積數千筆之後，開啟速度不會退化
 - **KV 快取**：當月 5 分鐘 TTL、過去月份 30 天；經由 App 的任何寫入都會即時清掉受影響月份的快取。
   直接在 Notion 網頁上改東西也會在 5 分鐘內同步過來，或按 App 裡的「更新」立即重抓
@@ -140,7 +142,7 @@ npm run deploy
 | `GEMINI_API_KEY` | secret | 收據辨識用，未設定時掃描功能會回錯誤但其他功能正常 |
 | `GEMINI_MODELS` | vars | 模型鏈，逗號分隔，依序嘗試 |
 | `MOCK` | .dev.vars | `1` 時使用內建假資料 |
-| `CACHE` | KV binding | 月份查詢快取 |
+| `CACHE` | KV binding | 月份查詢快取、session、登入節流計數 |
 
 ## 實作筆記
 
@@ -160,8 +162,10 @@ npm run deploy
 - **編輯與刪除前會先讀回原記錄**，這樣才知道要讓「哪一個月」的快取失效 —— 編輯有可能把日期改到別的月份。
   多一次 API 呼叫，但編輯是低頻操作，換來快取不會殘留舊值。
 - **前端所有選項值都會在 Worker 端過白名單**，前端就算被改也污染不了 Notion 的 select 選項。
-- **登入端點有以 IP 為單位的嘗試次數限制**（每小時 10 次），因為 Worker 網址是公開的。
-- **生物辨識是本機解鎖層**：WebAuthn 平台憑證通過才解除畫面鎖定，伺服器端真正的驗證仍是通行碼。
+- **通行碼只在 `/api/login` 出現一次**，因為 Worker 網址是公開的。登入有嘗試次數限制（同 IP 每小時 10 次、同名字 20 次），
+  成功後發 session cookie，其他端點只認 cookie。如果每個請求都帶通行碼，任何資料端點都能拿來繞過節流暴力猜。
+  session 記下登入當時通行碼的指紋，所以換通行碼就等於撤銷所有裝置。
+- **生物辨識是本機解鎖層**：WebAuthn 平台憑證通過才解除畫面鎖定，伺服器端真正的驗證是 session cookie。
   裝置不支援、憑證被刪或驗證失敗時一律可退回輸入通行碼。
 - **改過 `public/` 底下任何檔案**，記得把 `sw.js` 的 `CACHE` 版本號 +1，否則舊用戶會拿到快取的舊版。
 - **驗證觸控手勢時不要用 `elementFromPoint` 決定事件目標**。在 body 範圍外的畫布區域，
@@ -171,6 +175,18 @@ npm run deploy
 - 圖表全部是手寫 SVG（環形圖用 `stroke-dasharray` 疊圈、折線用 `polyline`），沒有引入任何圖表函式庫。
 
 ## 更新日誌
+
+### v1.5（2026-09-26）
+- **修安全漏洞：可以繞過登入頁暴力猜通行碼**。舊版每個 API 請求都帶 `x-user` / `x-code` header，
+  Worker 每次直接比對通行碼；登入端點雖然有擋嘗試次數，其他資料端點沒有，所以可以跳過登入頁無限次猜
+  - 改用 session：通行碼只在 `/api/login` 出現一次，成功後發 128-bit 隨機 session id，放在 JavaScript
+    讀不到的 HttpOnly cookie（`__Host-sid`，180 天）；其他端點只認 cookie，不再接受通行碼
+  - 登入節流：同一 IP 一小時錯 10 次、同一名字錯 20 次就回 429；通行碼改用固定時間比對
+  - session 記下登入當時通行碼的指紋，**換掉通行碼，所有裝置立刻登出**
+  - 會改變資料的請求檢查 `Origin`，跨站送來的一律 403；新增 `/api/logout`（登出按鈕會一併作廢 session）
+  - 前端不再把通行碼存在 localStorage。已登入的舊版**不必重新輸入**：更新後第一次開啟會用存著的通行碼
+    自動換一次 session cookie，然後刪掉通行碼
+  - 做法與北海道旅費記帳 v2.21、tax-viewer 相同
 
 ### v1.2（2026-08-02）
 - **修正拍照後「記憶體不足」而讓分頁被系統回收**：原本把相機原圖整張丟進 `<img>` 解碼再畫到 canvas，

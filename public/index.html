@@ -480,8 +480,8 @@ main section.slide-l{animation:viewInL .24s cubic-bezier(.25,.8,.35,1)}
 
 <script>
 'use strict';
-const VERSION = 'v1.4';
-const BUILD = '2026-09-11';
+const VERSION = 'v1.5';
+const BUILD = '2026-09-26';
 
 // ================= 圖示（SVG, 24x24 stroke） =================
 const P = {
@@ -636,7 +636,9 @@ const DEFAULT_RATES = {JPY:0.21, USD:32, EUR:35, KRW:0.024, CNY:4.5};
 const $ = s => document.querySelector(s);
 
 let me = localStorage.getItem('pe_user') || '';
-let myCode = localStorage.getItem('pe_code') || '';
+// 舊版把通行碼存在 localStorage、每個請求都帶上；現在改用 HttpOnly session cookie。
+// 這個值只在升級後第一次開啟時用一次，換成 cookie 就刪掉
+const legacyCode = localStorage.getItem('pe_code') || '';
 let rates = load('pe_rates', DEFAULT_RATES);
 let templates = load('pe_tpl', []);
 let queue = load('pe_queue', []);
@@ -715,7 +717,7 @@ function toast(msg, action) {
 async function api(path, opts = {}) {
   const r = await fetch('/api' + path, {
     ...opts,
-    headers: { 'content-type': 'application/json', 'x-user': me, 'x-code': myCode, ...(opts.headers || {}) }
+    headers: { 'content-type': 'application/json', ...(opts.headers || {}) }
   });
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) { logout(false); throw new Error(t('relogin')); }
@@ -868,7 +870,7 @@ function suppressClick() {
 
 // ================= 登入與生物辨識鎖 =================
 // WebAuthn 在這裡當「本機解鎖層」：註冊一把平台憑證，之後每次開 App 要求 Face ID／指紋，
-// 通過才把畫面解鎖。伺服器端真正的驗證仍是通行碼（存在這台裝置的 localStorage）。
+// 通過才把畫面解鎖。伺服器端真正的驗證是 session cookie（登入時用通行碼換來的）。
 // 裝置不支援、憑證被刪、或驗證失敗時，一律可退回輸入通行碼，不會把人鎖在門外。
 const bioEnabled = () => localStorage.getItem('pe_bio') === '1' && !!localStorage.getItem('pe_bio_id');
 
@@ -951,11 +953,12 @@ function unlock() {
 
 function logout(ask = true) {
   if (ask && !confirm(t('logoutConfirm'))) return;
+  if (ask) fetch('/api/logout', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('pe_user');
   localStorage.removeItem('pe_code');
   localStorage.removeItem('pe_bio');
   localStorage.removeItem('pe_bio_id');
-  me = ''; myCode = '';
+  me = '';
   monthData = {}; summaryCache = null;
   showLogin(false);
 }
@@ -972,9 +975,8 @@ async function doLogin() {
     });
     const d = await r.json();
     if (!r.ok) { $('#loginErr').textContent = d.error || t('badLogin'); return; }
-    me = d.user; myCode = code;
+    me = d.user;
     localStorage.setItem('pe_user', me);
-    localStorage.setItem('pe_code', myCode);
     unlock();
   } catch (e) {
     $('#loginErr').textContent = t('offline') + e.message;
@@ -1943,11 +1945,26 @@ function bindEvents() {
   });
 }
 
-function init() {
+// 從舊版升級：用存著的通行碼換一次 session cookie，之後就不再保存通行碼。
+// 離線時換不到就先照舊進入（記帳會排進離線佇列），下次開啟再換
+async function migrateLegacyCode() {
+  if (!me || !legacyCode) return;
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ user: me, code: legacyCode })
+    });
+    if (r.ok || r.status === 401) localStorage.removeItem('pe_code');
+    if (r.status === 401) logout(false); // 通行碼已經換掉：跟被撤銷一樣，回登入頁
+  } catch {}
+}
+
+async function init() {
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   bindEvents();
-  if (!me || !myCode) showLogin(false);
+  await migrateLegacyCode();
+  if (!me) showLogin(false);
   else if (bioEnabled()) showLogin(true);
   else boot();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
